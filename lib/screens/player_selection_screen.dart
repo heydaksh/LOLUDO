@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class PlayerSelectionScreen extends StatefulWidget {
   const PlayerSelectionScreen({super.key});
@@ -41,6 +42,7 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
 
     return GestureDetector(
       onTap: () {
+        HapticFeedback.mediumImpact();
         int index = _getIndex(color);
         _togglePlayer(index);
       },

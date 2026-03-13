@@ -66,6 +66,12 @@ class Pawn {
 
   /// The current lifecycle state of this pawn. See [PawnState].
   PawnState state;
+  DateTime? shieldExpiry;
+  int frozenTurns;
+  bool hasReverse;
+
+  bool get isShielded =>
+      shieldExpiry != null && DateTime.now().isBefore(shieldExpiry!);
 
   // ─── Animation Flags ───
 
@@ -84,6 +90,8 @@ class Pawn {
     this.state = PawnState.inBase,
     this.isDeadAnimation = false,
     this.isWinningAnimation = false,
+    this.frozenTurns = 0,
+    this.hasReverse = false,
   });
 
   // ==============================
@@ -97,6 +105,9 @@ class Pawn {
     state = PawnState.inBase;
     isDeadAnimation = false;
     isWinningAnimation = false;
+    frozenTurns = 0;
+    hasReverse = false;
+    shieldExpiry = null;
   }
 }
 
@@ -116,8 +127,13 @@ class Player {
   /// Whether this player is currently participating in the game.
   /// Can be used to skip inactive players in multi-player setups.
   bool isActive;
-
-  Player({required this.color, required this.pawns, this.isActive = true});
+  bool hasMultiplier;
+  Player({
+    required this.color,
+    required this.pawns,
+    this.isActive = true,
+    this.hasMultiplier = false,
+  });
 
   // ==============================
   // COMPUTED PROPERTIES

@@ -8,6 +8,7 @@ import 'package:ludo_game/widgets/board_painter.dart';
 import 'package:ludo_game/widgets/dice_widget.dart';
 import 'package:ludo_game/widgets/pawn_widget.dart';
 import 'package:ludo_game/widgets/portal_widget.dart';
+import 'package:ludo_game/widgets/power_widget.dart';
 import 'package:ludo_game/widgets/victory_overlay.dart';
 import 'package:provider/provider.dart';
 
@@ -40,8 +41,13 @@ class LudoScreen extends StatelessWidget {
     final currentTurn = context.select<GameProvider, PlayerColor>(
       (p) => p.currentTurn,
     );
-
-    final winner = context.select<GameProvider, PlayerColor?>((p) => p.winner);
+    final isGameOver = context.select<GameProvider, bool>((p) => p.isGameOver);
+    final winner = context.select<GameProvider, List<PlayerColor>>(
+      (p) => p.winner,
+    );
+    final allPlayers = context.select<GameProvider, List<PlayerColor>>(
+      (p) => p.players.map((e) => e.color).toList(),
+    );
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -81,8 +87,11 @@ class LudoScreen extends StatelessWidget {
 
           // ─── 5. VICTORY OVERLAY ───
           // Covers the entire screen when a winner is determined.
-          if (winner != null)
-            Positioned.fill(child: VictoryOverlay(winnerColor: winner)),
+          // ─── 5. VICTORY OVERLAY ───
+          if (isGameOver)
+            Positioned.fill(
+              child: VictoryOverlay(winners: winner, allPlayers: allPlayers),
+            ),
 
           // ─── 6. TELEPORT FLASH ───
           const _TeleportFlashOverlay(),
@@ -132,7 +141,7 @@ class _BackgroundLayer extends StatelessWidget {
       'assets/images/bg_image_3.webp',
       fit: BoxFit.cover,
       // ADJUSTABLE: Change background image opacity here (currently 0.7).
-      opacity: const AlwaysStoppedAnimation(.7),
+      opacity: const AlwaysStoppedAnimation(.3),
     );
   }
 }
@@ -150,82 +159,357 @@ class _SettingsMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      // ADJUSTABLE: Change settings menu bar height here (currently 40 px).
-      height: 40,
-      alignment: Alignment.bottomRight,
-      child: PopupMenuButton(
-        color: Colors.transparent,
-        icon: const Icon(Icons.settings),
-        itemBuilder: (context) {
-          return const [
-            PopupMenuItem(
-              value: 'Hacks',
-              child: Text(
-                'Hacks',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            PopupMenuItem(
-              value: 'Reset',
-              child: Text(
-                'Reset',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            PopupMenuItem(
-              value: 'Exit',
-              child: Text('Exit', style: TextStyle(color: Colors.red)),
-            ),
-          ];
-        },
-        onSelected: (value) async {
-          debugPrint("Settings menu selected: $value");
+    final size = MediaQuery.of(context).size;
+    final gameProvider = context.watch<GameProvider>();
 
-          if (value == 'Hacks') {
-            _showHackMenu(context);
-          } else if (value == 'Reset') {
-            context.read<GameProvider>().restartGame();
-          } else if (value == 'Exit') {
-            showDialog(
-              context: context,
-              builder: (_) {
-                return AlertDialog(
-                  title: Text('Exit Game'),
-                  content: Text('Are you sure you want to exit?'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text('Cancel'),
-                    ),
-                    TextButton(
-                      onPressed: () async {
-                        Navigator.pop(context);
-                        final int? count = await Navigator.push<int>(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const PlayerSelectionScreen(),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      child: SizedBox(
+        height: size.height / 18,
+        child: Align(
+          alignment: Alignment.bottomRight,
+          child: Container(
+            margin: EdgeInsets.only(right: size.width / 40),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.6),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  blurRadius: 8,
+                  color: Colors.black.withValues(alpha: 0.4),
+                ),
+              ],
+            ),
+            child: PopupMenuButton<String>(
+              color: Colors.grey.shade900,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(size.width / 25),
+              ),
+              icon: Icon(
+                Icons.settings,
+                color: Colors.white,
+                size: size.width / 16,
+              ),
+
+              itemBuilder: (context) => [
+                /// HACKS
+                PopupMenuItem(
+                  value: 'Hacks',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.flash_on,
+                        color: Colors.orange,
+                        size: size.width / 20,
+                      ),
+                      SizedBox(width: size.width / 40),
+                      Text(
+                        "Hack Menu",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: size.width / 28,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                /// RESET
+                PopupMenuItem(
+                  value: 'Reset',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.restart_alt,
+                        color: Colors.green,
+                        size: size.width / 20,
+                      ),
+                      SizedBox(width: size.width / 40),
+                      Text(
+                        "Restart Game",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: size.width / 28,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // remove player
+                PopupMenuItem(
+                  value: 'Remove',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.person_remove,
+                        color: Colors.cyanAccent,
+                        size: size.width / 20,
+                      ),
+                      SizedBox(width: size.width / 40),
+                      Text(
+                        "Remove Player",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: size.width / 28,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Pass Turn
+                PopupMenuItem(
+                  value: 'PassTurn',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.skip_next_sharp,
+                        color: Colors.blue,
+                        size: size.width / 20,
+                      ),
+                      SizedBox(width: size.width / 40),
+                      Text(
+                        "Pass Turn",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: size.width / 28,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                /// EXIT
+                PopupMenuItem(
+                  value: 'Exit',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.exit_to_app,
+                        color: Colors.red,
+                        size: size.width / 20,
+                      ),
+                      SizedBox(width: size.width / 40),
+                      Text(
+                        "Exit Game",
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: size.width / 28,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              onSelected: (value) async {
+                debugPrint("Settings menu selected: $value");
+
+                if (value == 'Hacks') {
+                  _showHackMenu(context);
+                } else if (value == 'Reset') {
+                  showDialog(
+                    context: context,
+                    builder: (_) {
+                      return AlertDialog(
+                        title: Row(
+                          children: [
+                            Icon(
+                              Icons.restart_alt,
+                              color: Colors.green,
+                              size: size.width / 10,
+                            ),
+                            SizedBox(width: size.width / 40),
+                            Text(
+                              "Reset Game",
+                              style: TextStyle(
+                                fontSize: size.width / 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ],
+                        ),
+                        content: Text(
+                          "Are you sure you want to reset the game?",
+                          style: TextStyle(fontSize: size.width / 28),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                            },
+                            child: Text(
+                              "Cancel",
+                              style: TextStyle(
+                                fontSize: size.width / 28,
+                                color: Colors.red,
+                              ),
+                            ),
                           ),
-                        );
-                        // Re-initialize the game with the newly chosen player count.
-                        if (count != null && context.mounted) {
-                          context.read<GameProvider>().initializePlayers(count);
-                        }
-                      },
-                      child: Text('Exit'),
-                    ),
-                  ],
-                );
+                          TextButton(
+                            onPressed: () {
+                              context.read<GameProvider>().restartGame();
+                              Navigator.pop(context);
+                            },
+                            child: Text(
+                              "Reset",
+                              style: TextStyle(
+                                fontSize: size.width / 28,
+                                color: Colors.green,
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                } else if (value == 'Remove') {
+                  _showRemovePlayerDialog(context);
+                } else if (value == 'PassTurn') {
+                  HapticFeedback.mediumImpact();
+                  gameProvider.nextTurn();
+                } else if (value == 'Exit') {
+                  showDialog(
+                    context: context,
+                    builder: (_) {
+                      return Dialog(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(size.width / 18),
+                        ),
+                        child: Container(
+                          padding: EdgeInsets.all(size.width / 18),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(
+                              size.width / 18,
+                            ),
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFF5F5F5), Color(0xFFE0E0E0)],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              /// ICON
+                              Icon(
+                                Icons.exit_to_app,
+                                size: size.width / 8,
+                                color: Colors.red,
+                              ),
+
+                              SizedBox(height: size.height / 80),
+
+                              /// TITLE
+                              Text(
+                                "Exit Game",
+                                style: TextStyle(
+                                  fontSize: size.width / 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+
+                              SizedBox(height: size.height / 100),
+
+                              /// MESSAGE
+                              Text(
+                                "Are you sure you want to exit the game?",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: size.width / 26,
+                                  color: Colors.black54,
+                                ),
+                              ),
+
+                              SizedBox(height: size.height / 40),
+
+                              /// BUTTONS
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  /// CANCEL
+                                  ElevatedButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    style: ElevatedButton.styleFrom(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: size.width / 15,
+                                        vertical: size.height / 70,
+                                      ),
+                                      backgroundColor: Colors.grey,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          size.width / 10,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      "Cancel",
+                                      style: TextStyle(
+                                        fontSize: size.width / 26,
+                                      ),
+                                    ),
+                                  ),
+
+                                  /// EXIT
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      Navigator.pop(context);
+
+                                      final int? count =
+                                          await Navigator.push<int>(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  const PlayerSelectionScreen(),
+                                            ),
+                                          );
+
+                                      if (count != null && context.mounted) {
+                                        context
+                                            .read<GameProvider>()
+                                            .initializePlayers(count);
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: size.width / 15,
+                                        vertical: size.height / 70,
+                                      ),
+                                      backgroundColor: Colors.red,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          size.width / 10,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      "Exit",
+                                      style: TextStyle(
+                                        fontSize: size.width / 26,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                }
               },
-            );
-          }
-        },
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -241,102 +525,270 @@ class _SettingsMenu extends StatelessWidget {
   ///
   /// Uses Consumer -GameProvider- so each button reflects live state.
   void _showHackMenu(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+
     showModalBottomSheet(
-      showDragHandle: true,
-      backgroundColor: Colors.white,
       context: context,
+      showDragHandle: true,
+      backgroundColor: Colors.transparent,
       builder: (_) {
         return Consumer<GameProvider>(
           builder: (context, modalProvider, child) {
-            debugPrint("Hack menu rebuild");
-
-            return SizedBox(
-              // ADJUSTABLE: Change hack menu bottom sheet height here (currently 150 px).
-              height: 150,
-              width: double.infinity,
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      // ─── BULLDOZER MODE TOGGLE ───
-                      // Sweep-captures enemies on every intermediate step.
-                      ElevatedButton(
-                        onPressed: () {
-                          modalProvider.toggleBulldozerMode();
-                          HapticFeedback.mediumImpact();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          // Turns orange when active, grey when inactive.
-                          backgroundColor: modalProvider.isBulldozerMode
-                              ? Colors.orange
-                              : Colors.grey,
-                          foregroundColor: Colors.white,
-                          elevation: 4,
-                        ),
-                        child: Text(
-                          modalProvider.isBulldozerMode
-                              ? 'Bulldozer: ON'
-                              : 'Bulldozer: OFF',
-                        ),
-                      ),
-
-                      const SizedBox(width: 10),
-
-                      // ─── ELIMINATE ALL TOGGLE ───
-                      // Kills ALL opponent pawns on the same cell (not just one).
-                      ElevatedButton(
-                        onPressed: () {
-                          modalProvider.toggleEliminateAll();
-                          HapticFeedback.mediumImpact();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          // Green when active (all-clear mode), red when inactive.
-                          backgroundColor: modalProvider.eliminateAllOpponents
-                              ? Colors.green
-                              : Colors.red,
-                          foregroundColor: Colors.white,
-                          elevation: 4,
-                        ),
-                        child: Text(
-                          modalProvider.eliminateAllOpponents
-                              ? 'Eliminate All: ON'
-                              : 'Eliminate All: OFF',
-                        ),
-                      ),
-
-                      const SizedBox(width: 10),
-
-                      // ─── ALWAYS ROLL 6 TOGGLE ───
-                      // Forces every dice roll to produce a 6.
-                      ElevatedButton(
-                        onPressed: () {
-                          modalProvider.toggleAlwaysRollSix();
-                          HapticFeedback.mediumImpact();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          // Purple when active, grey when inactive.
-                          backgroundColor: modalProvider.alwaysRollSix
-                              ? Colors.purple
-                              : Colors.grey,
-                          foregroundColor: Colors.white,
-                          elevation: 4,
-                        ),
-                        child: Text(
-                          modalProvider.alwaysRollSix
-                              ? 'Always 6: ON'
-                              : 'Always 6: OFF',
-                        ),
-                      ),
-                    ],
+            return Container(
+              height: size.height / 4.5,
+              padding: EdgeInsets.symmetric(
+                horizontal: size.width / 25,
+                vertical: size.height / 80,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(size.width / 18),
+                ),
+                boxShadow: const [
+                  BoxShadow(blurRadius: 20, color: Colors.black26),
+                ],
+              ),
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  /// BULLDOZER MODE
+                  _hackCard(
+                    size: size,
+                    icon: Icons.shield,
+                    title: "Bulldozer",
+                    subtitle: "Sweep enemies",
+                    active: modalProvider.isBulldozerMode,
+                    color: Colors.orange,
+                    onTap: () {
+                      modalProvider.toggleBulldozerMode();
+                      HapticFeedback.mediumImpact();
+                    },
                   ),
+
+                  SizedBox(width: size.width / 25),
+
+                  /// ELIMINATE ALL
+                  _hackCard(
+                    size: size,
+                    icon: Icons.flash_on,
+                    title: "Eliminate",
+                    subtitle: "Break stack rule",
+                    active: modalProvider.eliminateAllOpponents,
+                    color: Colors.green,
+                    onTap: () {
+                      modalProvider.toggleEliminateAll();
+                      HapticFeedback.mediumImpact();
+                    },
+                  ),
+
+                  SizedBox(width: size.width / 25),
+
+                  /// ALWAYS 6
+                  _hackCard(
+                    size: size,
+                    icon: Icons.casino,
+                    title: "Always 6",
+                    subtitle: "Fixed dice",
+                    active: modalProvider.alwaysRollSix,
+                    color: Colors.purple,
+                    onTap: () {
+                      modalProvider.toggleAlwaysRollSix();
+                      HapticFeedback.mediumImpact();
+                    },
+                  ),
+
+                  SizedBox(width: size.width / 25),
+
+                  /// SPECIAL POWERS
+                  _hackCard(
+                    size: size,
+                    icon: Icons.bolt,
+                    title: "Powers",
+                    subtitle: "Power tiles",
+                    active: modalProvider.enableSpecialPowers,
+                    color: Colors.amber,
+                    onTap: () {
+                      modalProvider.toggleSpecialPowers();
+                      HapticFeedback.mediumImpact();
+                    },
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // remove player
+  void _showRemovePlayerDialog(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+
+    showDialog(
+      context: context,
+      builder: (_) {
+        return Consumer<GameProvider>(
+          builder: (context, provider, child) {
+            final players = provider.players;
+
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(size.width / 18),
+              ),
+              child: Container(
+                padding: EdgeInsets.all(size.width / 18),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(size.width / 18),
+                  color: Colors.white,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    /// TITLE
+                    Text(
+                      "Remove Player(s)",
+                      style: TextStyle(
+                        fontSize: size.width / 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      "Who don't want to play",
+                      style: TextStyle(
+                        fontSize: size.width / 26,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+
+                    SizedBox(height: size.height / 40),
+
+                    /// PLAYER LIST
+                    ...players.map((player) {
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: _getColor(player.color),
+                        ),
+
+                        title: Text(
+                          player.color.name.toUpperCase(),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: size.width / 26,
+                          ),
+                        ),
+
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () {
+                            provider.removePlayer(player.color);
+
+                            Navigator.pop(context);
+                          },
+                        ),
+                      );
+                    }),
+
+                    SizedBox(height: size.height / 80),
+
+                    /// CLOSE BUTTON
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text("Close"),
+                    ),
+                  ],
                 ),
               ),
             );
           },
         );
       },
+    );
+  }
+
+  Color _getColor(PlayerColor color) {
+    switch (color) {
+      case PlayerColor.green:
+        return Colors.green;
+      case PlayerColor.yellow:
+        return Colors.yellow;
+      case PlayerColor.blue:
+        return Colors.blue;
+      case PlayerColor.red:
+        return Colors.red;
+    }
+  }
+
+  Widget _hackCard({
+    required Size size,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool active,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        width: size.width / 3,
+        padding: EdgeInsets.all(size.width / 25),
+        decoration: BoxDecoration(
+          gradient: active
+              ? LinearGradient(colors: [color, color.withValues(alpha: 0.7)])
+              : null,
+          color: active ? null : Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(size.width / 18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.15),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: active ? Colors.white : Colors.black54,
+              size: size.width / 12,
+            ),
+
+            SizedBox(height: size.height / 120),
+
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: size.width / 26,
+                fontWeight: FontWeight.bold,
+                color: active ? Colors.white : Colors.black,
+              ),
+            ),
+
+            SizedBox(height: size.height / 200),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: size.width / 35,
+                color: active ? Colors.white70 : Colors.black54,
+              ),
+            ),
+
+            SizedBox(height: size.height / 150),
+
+            Icon(
+              active ? Icons.toggle_on : Icons.toggle_off,
+              color: active ? Colors.white : Colors.black38,
+              size: size.width / 10,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -369,7 +821,7 @@ class _BoardLayer extends StatelessWidget {
       children: [
         Padding(
           // ADJUSTABLE: Change board outer padding here (currently 10 px).
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.symmetric(horizontal: 7),
           child: AspectRatio(
             // Keep the board square at all screen sizes.
             aspectRatio: 1,
@@ -420,35 +872,159 @@ class _BoardLayer extends StatelessWidget {
                         size: boardSize,
                         painter: LudoBoardPainter(
                           portals: gameProvider.activePortals,
+                          portalState: gameProvider.activePortals
+                              .map((p) => '${p.a}-${p.b}-${p.remainingTurns}')
+                              .join('|'),
+                          // portalState: gameProvider.activePortals
+                          //     .map((p) => '${p.a}-${p.b}-${p.remainingTurns}')
+                          //     .join('|'),
                         ),
                       ),
                     ),
 
                     // ─── 1.5 PORTAL WIDGETS (ANIMATED) ───
                     ...gameProvider.activePortals.expand((portal) {
-                        final Offset posA = BoardCoordinates.mainPath[portal.a % 52];
-                        final Offset posB = BoardCoordinates.mainPath[portal.b % 52];
-                        
-                        final double cellSize = boardSize.width / 15;
-                        
-                        return [
-                            Positioned(
-                                left: posA.dx * cellSize + (cellSize - 32) / 2,
-                                top: posA.dy * cellSize + (cellSize - 32) / 2,
-                                child: PortalWidget(
-                                    type: portal.type,
-                                    remainingTurns: portal.remainingTurns,
+                      final Offset posA =
+                          BoardCoordinates.mainPath[portal.a % 52];
+                      final Offset posB =
+                          BoardCoordinates.mainPath[portal.b % 52];
+
+                      final double cellSize = boardSize.width / 15;
+
+                      return [
+                        Positioned(
+                          left: posA.dx * cellSize + (cellSize - 32) / 2,
+                          top: posA.dy * cellSize + (cellSize - 32) / 2,
+                          child: PortalWidget(
+                            type: portal.type,
+                            remainingTurns: portal.remainingTurns,
+                          ),
+                        ),
+                        Positioned(
+                          left: posB.dx * cellSize + (cellSize - 32) / 2,
+                          top: posB.dy * cellSize + (cellSize - 32) / 2,
+                          child: PortalWidget(
+                            type: portal.type,
+                            remainingTurns: portal.remainingTurns,
+                          ),
+                        ),
+                      ];
+                    }),
+
+                    // ─── 1.6 POWER WIDGETS (ANIMATED) ───
+                    ...gameProvider.activePower.map((power) {
+                      final Offset pos =
+                          BoardCoordinates.mainPath[power.position % 52];
+                      final double cellSize = boardSize.width / 15;
+
+                      return Positioned(
+                        left: pos.dx * cellSize + (cellSize - 30) / 2,
+                        top: pos.dy * cellSize + (cellSize - 30) / 2,
+                        child: PowerWidget(type: power.type),
+                      );
+                    }),
+
+                    ...gameProvider.winner.asMap().entries.map((entry) {
+                      final int rank = entry.key + 1;
+                      final PlayerColor color = entry.value;
+
+                      double left = 0;
+                      double top = 0;
+
+                      final double baseSize = boardSize.width * (5 / 15);
+
+                      // determine which color's base is in..
+                      switch (color) {
+                        case PlayerColor.green:
+                          left = 11;
+                          top = 11;
+                          break;
+                        case PlayerColor.yellow:
+                          left = boardSize.width * (9.5 / 15);
+                          top = 11;
+                          break;
+                        case PlayerColor.blue:
+                          left = boardSize.width * (9 / 15);
+                          top = boardSize.width * (9 / 15);
+                          break;
+                        case PlayerColor.red:
+                          left = 0;
+                          top = boardSize.width * (9 / 15);
+                          break;
+                      }
+
+                      Color crownColor;
+                      String rankText;
+                      if (rank == 1) {
+                        crownColor = Colors.amber; // golden crown
+                        rankText = "1st";
+                      } else if (rank == 2) {
+                        crownColor = Colors.grey.shade300; // sliver crown
+                        rankText = "2nd";
+                      } else {
+                        crownColor = const Color(0xFFCD7F32); // Bronze
+                        rankText = "3RD";
+                      }
+
+                      return Positioned(
+                        left: left,
+                        top: top,
+                        width: baseSize,
+                        height: baseSize,
+                        child: IgnorePointer(
+                          child: TweenAnimationBuilder<double>(
+                            curve: Curves.elasticOut,
+                            key: ValueKey('Crown${color.name}'),
+                            tween: Tween(begin: 0.0, end: 1.0),
+                            duration: const Duration(milliseconds: 800),
+                            builder: (context, scale, child) {
+                              return Transform.scale(
+                                scale: scale,
+                                child: child,
+                              );
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.4),
+                                shape: BoxShape.circle,
+                              ),
+                              margin: .all(baseSize * 0.15),
+                              child: Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.emoji_events,
+                                      color: crownColor,
+                                      size: baseSize * 0.35,
+                                      shadows: const [
+                                        Shadow(
+                                          color: Colors.black87,
+                                          blurRadius: 6,
+                                        ),
+                                      ],
+                                    ),
+                                    Text(
+                                      rankText,
+                                      style: TextStyle(
+                                        color: crownColor,
+                                        fontSize: baseSize * 0.15,
+                                        fontWeight: FontWeight.bold,
+                                        shadows: const [
+                                          Shadow(
+                                            color: Colors.black87,
+                                            blurRadius: 6,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
+                              ),
                             ),
-                            Positioned(
-                                left: posB.dx * cellSize + (cellSize - 32) / 2,
-                                top: posB.dy * cellSize + (cellSize - 32) / 2,
-                                child: PortalWidget(
-                                    type: portal.type,
-                                    remainingTurns: portal.remainingTurns,
-                                ),
-                            ),
-                        ];
+                          ),
+                        ),
+                      );
                     }),
 
                     // ─── 2. PAWN WIDGETS ───
@@ -519,23 +1095,64 @@ class _BoardLayer extends StatelessWidget {
             ),
           ),
         ),
-
+        SizedBox(height: 20),
         // ─── PASS TURN BUTTON ───
         // Allows the current player to manually skip their turn.
-        Align(
-          alignment: Alignment.center,
-          child: ElevatedButton(
-            onPressed: () {
-              debugPrint("Pass turn pressed");
-              HapticFeedback.mediumImpact();
-              gameProvider.nextTurn();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white.withValues(alpha: 0.9),
-              foregroundColor: Colors.black,
-              elevation: 4,
-            ),
-            child: const Text('Pass Turn'),
+        // ─── ACTION BUTTONS (PASS TURN & POWERS) ───
+        SizedBox(
+          width: double.infinity,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // 1. Pass Turn Button
+              ElevatedButton(
+                onPressed: () {
+                  debugPrint("Pass turn pressed");
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white.withValues(alpha: 0.9),
+                  foregroundColor: Colors.black,
+                  elevation: 4,
+                ),
+                child: const Text('Pass Turn'),
+              ),
+
+              // 2. Reverse Power Button (Only shows if current player has the power)
+              if (gameProvider.players
+                  .firstWhere((p) => p.color == gameProvider.currentTurn)
+                  .pawns
+                  .any((p) => p.hasReverse && p.state == PawnState.onPath)) ...[
+                const SizedBox(width: 15),
+
+                ElevatedButton.icon(
+                  onPressed: () {
+                    HapticFeedback.mediumImpact();
+                    gameProvider.toggleReverseMode();
+                  },
+                  icon: Icon(
+                    Icons.u_turn_left,
+                    color: gameProvider.useReverseMode
+                        ? Colors.white
+                        : Colors.purple,
+                  ),
+                  label: Text(
+                    gameProvider.useReverseMode
+                        ? 'Cancel Reverse'
+                        : 'Use Reverse',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: gameProvider.useReverseMode
+                        ? Colors.purple
+                        : Colors.white,
+                    foregroundColor: gameProvider.useReverseMode
+                        ? Colors.white
+                        : Colors.purple,
+                    elevation: 4,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ],

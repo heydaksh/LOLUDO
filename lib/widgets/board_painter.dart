@@ -27,8 +27,9 @@ import 'package:ludo_game/utils/board_coordinates.dart';
 
 class LudoBoardPainter extends CustomPainter {
   final List<Portals> portals;
+  final String portalState;
 
-  LudoBoardPainter({this.portals = const []});
+  LudoBoardPainter({this.portals = const [], this.portalState = ''});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -228,7 +229,7 @@ class LudoBoardPainter extends CustomPainter {
     }
 
     // ─── Yellow (Top Arm) ───
-    fill.color = Colors.yellow.shade700.withValues(alpha: 1);
+    fill.color = Colors.yellow;
     for (int i = 1; i <= 5; i++) {
       canvas.drawRect(
         Rect.fromLTWH(7 * cellSize, i * cellSize, cellSize, cellSize),
@@ -422,7 +423,7 @@ class LudoBoardPainter extends CustomPainter {
     final Offset center = Offset(size.width / 2, size.height / 2);
 
     final Paint greenPaint = Paint()..color = Colors.green;
-    final Paint yellowPaint = Paint()..color = Colors.yellow.shade700;
+    final Paint yellowPaint = Paint()..color = Colors.yellow;
     final Paint bluePaint = Paint()..color = Colors.blue;
     final Paint redPaint = Paint()..color = Colors.red;
 
@@ -493,9 +494,9 @@ class LudoBoardPainter extends CustomPainter {
 
       // 1. Draw dashed connecting line between A and B
       final paintLine = Paint()
-        ..color = portalColor.withValues(alpha: 0.4)
+        ..color = portalColor.withValues(alpha: 0.8)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2;
+        ..strokeWidth = 3;
 
       _drawDashedLine(canvas, centerA, centerB, paintLine);
       // (Static dots removed: now drawn by animated PortalWidgets in LudoScreen)
@@ -537,15 +538,7 @@ class LudoBoardPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant LudoBoardPainter oldDelegate) {
-    // Repaint if portals changed
-    if (portals.length != oldDelegate.portals.length) return true;
-    for (int i = 0; i < portals.length; i++) {
-      if (portals[i].a != oldDelegate.portals[i].a ||
-          portals[i].b != oldDelegate.portals[i].b ||
-          portals[i].remainingTurns != oldDelegate.portals[i].remainingTurns) {
-        return true;
-      }
-    }
-    return false;
+    // Repaint when the unique derived state string of portals changes
+    return portalState != oldDelegate.portalState;
   }
 }

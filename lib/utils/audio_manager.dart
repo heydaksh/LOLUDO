@@ -55,7 +55,7 @@ class AudioManager {
   ];
 
   /// Sound played each time a pawn moves one step forward on the path.
-  static const List<String> pawnMovementSound = ['sounds/jump.wav'];
+  static const List<String> pawnMovementSound = ['sounds/pawn_move.wav'];
 
   /// Sound played when the dice is rolled.
   static const List<String> diceRollSound = ['sounds/dice_roll.wav'];
@@ -66,7 +66,8 @@ class AudioManager {
   /// Sound played when a pawn is teleported through a portal.
   /// Reuses the triangle_reach asset for a distinct "whoosh" feel.
   static const List<String> portalTeleportSound = [
-    'sounds/triangle_reach.wav',
+    'entry/spiderman.wav',
+    'entry/yooooooooooooooooooo.wav',
   ];
 
   /// Sound played when a pawn reaches the center winning triangle.

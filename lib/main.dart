@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:ludo_game/providers/game_provider.dart';
-import 'package:ludo_game/screens/ludo_screen.dart';
+import 'package:ludo_game/screens/instructions_screen.dart';
 import 'package:ludo_game/screens/start_screen.dart';
 import 'package:ludo_game/utils/audio_manager.dart';
 import 'package:provider/provider.dart';
@@ -104,7 +104,7 @@ class _StartGameRouterState extends State<_StartGameRouter> {
         // Replace this router with the main game screen.
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const LudoScreen()),
+          MaterialPageRoute(builder: (_) => const InstructionsScreen()),
         );
       });
     }
