@@ -20,8 +20,16 @@ class GameProvider extends ChangeNotifier {
   // GAME STATE VARIABLES
   // ==============================
 
+  Map<PlayerColor, String> _startingConfig = {};
+
+  /// Increments every time a new game starts to trigger one-time overlay animations.
+  int gameSessionId = 0;
+
   /// List of all active players in the current game session.
   List<Player> players = [];
+
+  /// List of players who have been removed/quit during the current match.
+  List<PlayerColor> removedPlayers = [];
 
   /// The color of the player whose turn it currently is.
   PlayerColor currentTurn = PlayerColor.green;
@@ -132,9 +140,19 @@ class GameProvider extends ChangeNotifier {
   /// Internal: Creates the default 4-player game with all pawns in base.
   void _initializeGame() {
     debugPrint('🎮 Initializing new game...');
+
+    // [FIX] Save default config
+    _startingConfig = {
+      PlayerColor.green: "Player 1",
+      PlayerColor.yellow: "Player 2",
+      PlayerColor.blue: "Player 3",
+      PlayerColor.red: "Player 4",
+    };
+
     players = [
       Player(
         color: PlayerColor.green,
+        name: "Player 1",
         pawns: List.generate(
           4,
           (index) => Pawn(id: index, color: PlayerColor.green),
@@ -142,6 +160,7 @@ class GameProvider extends ChangeNotifier {
       ),
       Player(
         color: PlayerColor.yellow,
+        name: "Player 2",
         pawns: List.generate(
           4,
           (index) => Pawn(id: index, color: PlayerColor.yellow),
@@ -149,6 +168,7 @@ class GameProvider extends ChangeNotifier {
       ),
       Player(
         color: PlayerColor.blue,
+        name: "Player 3",
         pawns: List.generate(
           4,
           (index) => Pawn(id: index, color: PlayerColor.blue),
@@ -156,6 +176,7 @@ class GameProvider extends ChangeNotifier {
       ),
       Player(
         color: PlayerColor.red,
+        name: "Player 4",
         pawns: List.generate(
           4,
           (index) => Pawn(id: index, color: PlayerColor.red),
@@ -168,6 +189,10 @@ class GameProvider extends ChangeNotifier {
   // SPAWN POWER
   // ======================
 
+  // ======================
+  // SPAWN POWER
+  // ======================
+
   Power spawnPower() {
     final random = Random();
     int position;
@@ -175,60 +200,48 @@ class GameProvider extends ChangeNotifier {
     do {
       position = random.nextInt(52);
     } while (isRestrictedTile(position) ||
-        activePortals.any((p) => p.a == position));
+        activePortals.any((p) => p.a == position || p.b == position) ||
+        activePower.any((p) => p.position == position));
 
     final type = PowerType.values[random.nextInt(PowerType.values.length)];
+
+    // Logging power spawn using debugPrint as per your control instructions
+    debugPrint(
+      '🌟 [SPAWN] Generated power ${type.name} at valid position $position',
+    );
+
     return Power(position: position, type: type);
   }
 
   /// Called from the player selection screen.
   /// Configures the game for the chosen number of players (2–4).
   /// 2-player mode uses Green vs Blue (face-to-face positions).
-  void initializePlayers(int playerCount) {
-    debugPrint("GameProvider: initializing $playerCount players");
+  void initializePlayers(Map<PlayerColor, String> selectedPlayersInfo) {
+    debugPrint(
+      "GameProvider: initializing ${selectedPlayersInfo.length} players",
+    );
+    gameSessionId++; // Trigger the start animation
+    removedPlayers.clear();
+
+    // [FIX] Save the exact starting configuration
+    _startingConfig = Map.from(selectedPlayersInfo);
 
     players.clear();
 
-    List<PlayerColor> activeColors;
-
-    switch (playerCount) {
-      case 2:
-        // Face-to-face players
-        activeColors = [PlayerColor.green, PlayerColor.blue];
-        break;
-
-      case 3:
-        activeColors = [
-          PlayerColor.green,
-          PlayerColor.yellow,
-          PlayerColor.blue,
-        ];
-        break;
-
-      case 4:
-      default:
-        activeColors = [
-          PlayerColor.green,
-          PlayerColor.yellow,
-          PlayerColor.blue,
-          PlayerColor.red,
-        ];
-    }
-
-    // Create one Player object per active color, each with 4 fresh pawns.
-    players = activeColors
-        .map(
-          (color) => Player(
-            color: color,
-            pawns: List.generate(4, (index) => Pawn(id: index, color: color)),
-          ),
-        )
-        .toList();
+    players = selectedPlayersInfo.entries.map((entry) {
+      return Player(
+        color: entry.key,
+        name: entry.value.trim().isEmpty
+            ? entry.key.name.toUpperCase()
+            : entry.value.trim(),
+        pawns: List.generate(4, (index) => Pawn(id: index, color: entry.key)),
+      );
+    }).toList();
 
     // First player in the list always goes first.
-    currentTurn = activeColors.first;
+    currentTurn = players.first.color;
 
-    debugPrint("Active players: ${activeColors.map((e) => e.name).toList()}");
+    debugPrint("Active players: ${players.map((e) => e.name).toList()}");
 
     notifyListeners();
   }
@@ -237,16 +250,12 @@ class GameProvider extends ChangeNotifier {
   /// Used by the "Play Again" / restart button.
   void restartGame() {
     debugPrint('🔄 Restarting game...');
-
-    /// Save currently active player colors
-    final List<PlayerColor> activeColors = players
-        .map((p) => p.color)
-        .toList(growable: false);
+    gameSessionId++; // Trigger the start animation
 
     /// Reset game state
     winner.clear();
     isGameOver = false;
-
+    removedPlayers.clear();
     diceResult = 1;
     hasRolled = false;
     isDiceRolling = false;
@@ -256,17 +265,20 @@ class GameProvider extends ChangeNotifier {
     _turnsUntilNextPortal = 6;
     lastTeleportedPawn = null;
 
-    /// Recreate players using preserved colors
-    if (activeColors.isNotEmpty) {
-      players = activeColors.map((color) {
+    /// Recreate players using the preserved starting configuration
+    if (_startingConfig.isNotEmpty) {
+      players = _startingConfig.entries.map((entry) {
         return Player(
-          color: color,
-          pawns: List.generate(4, (index) => Pawn(id: index, color: color)),
+          color: entry.key,
+          name: entry.value.trim().isEmpty
+              ? entry.key.name.toUpperCase()
+              : entry.value.trim(),
+          pawns: List.generate(4, (index) => Pawn(id: index, color: entry.key)),
         );
       }).toList();
 
-      /// Reset turn
-      currentTurn = activeColors.first;
+      /// Reset turn to the first player in the original lineup
+      currentTurn = players.first.color;
     } else {
       /// Fallback safety
       _initializeGame();
@@ -284,6 +296,14 @@ class GameProvider extends ChangeNotifier {
     if (currentTurn == color) {
       nextTurn();
     }
+    // [ADDED] Track the removed player so the UI can draw the icon
+    if (!removedPlayers.contains(color)) {
+      removedPlayers.add(color);
+      AudioManager.playRemovePlayer();
+      debugPrint(
+        '🚫 [PLAYER REMOVED] ${color.name} added to removedPlayers list.',
+      );
+    }
 
     // 2. Remove the player from the active players list
     players.removeWhere((p) => p.color == color);
@@ -300,6 +320,7 @@ class GameProvider extends ChangeNotifier {
       debugPrint(
         '[GAME OVER] ALL OPPONENTS REMOVED. ${remainingPlayer.name.toUpperCase()} WINS!',
       );
+      AudioManager.playGameWin();
     }
     // 4. Fallback: check if the remaining players trigger the standard game-over condition.
     else if (winner.length >= players.length - 1) {
@@ -330,18 +351,9 @@ class GameProvider extends ChangeNotifier {
 
       // Generate the dice value BEFORE notifying listeners
       final rand = Random();
-      // if (alwaysRollSix) {
-      //   diceResult = 6; // change here to fix dice value.
-      // } else {
-      //   final rand = Random();
-      //   if (rand.nextDouble() < 0.19) {
-      //     diceResult = 6;
-      //   } else {
-      //     diceResult = rand.nextInt(5) + 1;
-      //   }
-      // }
+
       if (alwaysRollSix) {
-        diceResult = 6;
+        diceResult = 6; //change dice value
       } else {
         diceResult = rand.nextDouble() < 0.19 ? 6 : rand.nextInt(5) + 1;
       }
@@ -357,7 +369,7 @@ class GameProvider extends ChangeNotifier {
       notifyListeners();
 
       // ADJUSTABLE: Change the dice animation display duration here
-      await Future.delayed(const Duration(milliseconds: 1000));
+      await Future.delayed(const Duration(milliseconds: 600));
     } finally {
       // Guarantee these resets happen
       isDiceRolling = false;
@@ -370,7 +382,11 @@ class GameProvider extends ChangeNotifier {
         );
         notifyListeners();
 
-        await Future.delayed(const Duration(milliseconds: 500));
+        await Future.delayed(const Duration(milliseconds: 1000));
+        if (isGameOver || !players.any((p) => p.color == currentTurn)) {
+          debugPrint('[ROLL ABORTED] Game state changed during dice roll.');
+          return;
+        }
         hasRolled = false;
         nextTurn();
       } else {
@@ -397,6 +413,7 @@ class GameProvider extends ChangeNotifier {
     } while (winner.contains(players[nextIndex].color) && !isGameOver);
     currentTurn = players[nextIndex].color;
     hasRolled = false;
+    AudioManager.playPassTurn();
     debugPrint('Turn passed to ${currentTurn.name.toUpperCase()}');
     // ─── Portal Spawn Countdown ───
     _turnsUntilNextPortal--;
@@ -446,10 +463,10 @@ class GameProvider extends ChangeNotifier {
         activePower.clear();
       }
     }
-    // --- Decrement Freeze Turns for the next player ---
+    // --- Decrement Shield Turns for the next player ---
     Player upcomingPlayer = players.firstWhere((p) => p.color == currentTurn);
     for (var pawn in upcomingPlayer.pawns) {
-      if (pawn.frozenTurns > 0) pawn.frozenTurns--;
+      if (pawn.shieldTurn > 0) pawn.shieldTurn--;
     }
 
     notifyListeners();
@@ -469,18 +486,20 @@ class GameProvider extends ChangeNotifier {
   bool _hasValidMoves() {
     Player activePlayer = players.firstWhere((p) => p.color == currentTurn);
     for (var pawn in activePlayer.pawns) {
-      if (pawn.state == PawnState.inBase && diceResult == 6) {
+      if (pawn.state == PawnState.inBase &&
+          (diceResult == 6 || diceResult == 12)) {
         return true;
       }
-      if (pawn.state == PawnState.onPath) {
-        return true;
-      }
-      if (pawn.state == PawnState.onHomeStretch) {
-        // Check if the pawn can actually move without overshooting the center.
-        // Step 56 = center (winning position).
-        int remainingSteps = 56 - pawn.step;
-        if (diceResult <= remainingSteps) {
+
+      // Unified check for both path and home stretch
+      if (pawn.state == PawnState.onPath ||
+          pawn.state == PawnState.onHomeStretch) {
+        if (pawn.step + diceResult <= 56) {
           return true;
+        } else {
+          debugPrint(
+            '[VALIDATION] ${pawn.color.name} pawn ${pawn.id} at step ${pawn.step} cannot move (needs ${56 - pawn.step} or less, rolled $diceResult).',
+          );
         }
       }
     }
@@ -495,24 +514,25 @@ class GameProvider extends ChangeNotifier {
   ///   - Base pawn needs 6.
   ///   - Home-stretch pawn must not overshoot center.
   bool canPawnMove(Pawn pawn) {
-    if (pawn.frozenTurns > 0) return false;
     if (pawn.color != currentTurn) return false;
     if (!hasRolled) return false;
 
-    // Base pawn needs 6 to exit.
+    // [FIX] Reverse Mode Validation
+    if (useReverseMode && pawn.hasReverse) {
+      // Cannot reverse if in base, finished, or exactly at step 0
+      if (pawn.state == PawnState.inBase || pawn.state == PawnState.finished)
+        return false;
+      if (pawn.step == 0) return false;
+      return true; // Valid to reverse
+    }
+
     if (pawn.state == PawnState.inBase) {
-      return diceResult == 6;
+      return diceResult == 6 || diceResult == 12;
     }
 
-    // Pawn on path can move normally.
-    if (pawn.state == PawnState.onPath) {
-      return true;
-    }
-
-    // Home stretch must not overshoot center (step 56).
-    if (pawn.state == PawnState.onHomeStretch) {
-      int remainingSteps = 56 - pawn.step;
-      return diceResult <= remainingSteps;
+    if (pawn.state == PawnState.onPath ||
+        pawn.state == PawnState.onHomeStretch) {
+      return (pawn.step + diceResult) <= 56;
     }
 
     return false;
@@ -532,47 +552,42 @@ class GameProvider extends ChangeNotifier {
     }
   }
 
+  // =================================
+  // ─── APPLY POWERS..  ───
+  // =================================
   Future<void> _applyPower(Pawn pawn, PowerType type) async {
     switch (type) {
-      case PowerType.freeze:
-        int myPos = BoardCoordinates.getAbsolutePosition(pawn);
-        for (var player in players) {
-          if (player.color != pawn.color) {
-            for (var oppPawn in player.pawns) {
-              if (oppPawn.state == PawnState.onPath) {
-                int enemyPos = BoardCoordinates.getAbsolutePosition(oppPawn);
-                // Calculate shortest wrap-around distance on a 52-cell board
-                int diff = (enemyPos - myPos).abs();
-                if (diff > 26) diff = 52 - diff;
-
-                if (diff <= 5) {
-                  oppPawn.frozenTurns = 1;
-                  debugPrint('❄️ [FREEZE] Frozen ${oppPawn.color.name} pawn!');
-                }
-              }
-            }
-          }
-        }
-        break;
-
       case PowerType.shield:
-        pawn.shieldExpiry = DateTime.now().add(const Duration(seconds: 30));
+        pawn.shieldTurn = 1;
+        debugPrint(
+          '🛡️ [SHIELD] Shield activated for ${pawn.color.name} pawn!',
+        );
         break;
 
       case PowerType.reverse:
         pawn.hasReverse = true;
+        debugPrint(
+          '🔄 [REVERSE] Reverse activated for ${pawn.color.name} pawn!',
+        );
         break;
 
       case PowerType.multiplier:
         players.firstWhere((p) => p.color == pawn.color).hasMultiplier = true;
+        debugPrint(
+          '✖️ [MULTIPLIER] Multiplier activated for ${pawn.color.name} pawn!',
+        );
         break;
 
       case PowerType.swap:
-        // Find all active enemies on the main path
+        // [FIX] Find all active enemies on the main path WHO ARE NOT ON SAFE ZONES
         List<Pawn> activeEnemies = players
             .where((p) => p.color != pawn.color)
             .expand((p) => p.pawns)
-            .where((p) => p.state == PawnState.onPath)
+            .where((p) {
+              if (p.state != PawnState.onPath) return false;
+              int targetAbs = BoardCoordinates.getAbsolutePosition(p);
+              return !BoardCoordinates.safeZones.contains(targetAbs);
+            })
             .toList();
 
         if (activeEnemies.isNotEmpty) {
@@ -595,6 +610,10 @@ class GameProvider extends ChangeNotifier {
           pawn.step = getRelative(targetAbs, pawn.color);
           target.step = getRelative(myAbs, target.color);
           debugPrint('🔄 [SWAP] Swapped with ${target.color.name} pawn!');
+        } else {
+          debugPrint(
+            '🔄 [SWAP FAILED] No eligible targets found (all enemies are in base, finished, or safe zones).',
+          );
         }
         break;
     }
@@ -632,30 +651,41 @@ class GameProvider extends ChangeNotifier {
     // ─── FAST FAIL LOCKS ───
     if (pawn.state == PawnState.finished) return;
 
-    if (pawn.state == PawnState.inBase && diceResult != 6) {
+    // [FIX] Prevent reverse power from being wasted at step 0
+    if (useReverseMode && pawn.hasReverse && pawn.step == 0) {
       debugPrint(
-        ' [INVALID MOVE] Cannot move ${pawn.color.name} pawn ${pawn.id} from base without a 6.',
+        '[INVALID MOVE] Cannot use reverse power on ${pawn.color.name} pawn ${pawn.id} because it is at step 0.',
       );
       return;
     }
 
-    if (pawn.state == PawnState.onHomeStretch) {
+    if (pawn.state == PawnState.inBase &&
+        (diceResult != 6 && diceResult != 12)) {
+      debugPrint(
+        '[INVALID MOVE] Cannot move ${pawn.color.name} pawn ${pawn.id} from base without a 6 or 12.',
+      );
+      return;
+    }
+
+    // Unified lock to prevent execution of an overshoot move
+    if (pawn.state == PawnState.onPath ||
+        pawn.state == PawnState.onHomeStretch) {
       int remainingSteps = 56 - pawn.step;
       if (diceResult > remainingSteps) {
         debugPrint(
-          ' [INVALID MOVE] ${pawn.color.name} pawn ${pawn.id} needs $remainingSteps or less.',
+          '[INVALID MOVE] ${pawn.color.name} pawn ${pawn.id} needs $remainingSteps or less to avoid overshoot. Rolled $diceResult.',
         );
         return;
       }
     }
-
     try {
       // Lock board to prevent concurrent inputs during animation.
       isAnimatingMove = true;
       debugPrint(' [MOVE START] Moving ${pawn.color.name} pawn ${pawn.id}');
 
       // ─── Base Exit (Special Case) ───
-      if (pawn.state == PawnState.inBase && diceResult == 6) {
+      if (pawn.state == PawnState.inBase &&
+          (diceResult == 6 || diceResult == 12)) {
         pawn.state = PawnState.onPath;
         pawn.step = 0;
         hasRolled = false; // Player gets another roll for exiting base
@@ -693,6 +723,15 @@ class GameProvider extends ChangeNotifier {
             AudioManager.playTriangleReach();
             notifyListeners();
             await Future.delayed(const Duration(milliseconds: 650));
+
+            // [FIX] Safety check 1
+            if (isGameOver || pawn.state == PawnState.inBase) {
+              debugPrint(
+                '[ANIMATION ABORTED] Game reset during win animation.',
+              );
+              return;
+            }
+
             pawn.state = PawnState.finished;
           } else {
             AudioManager.playPawnMovement();
@@ -701,6 +740,14 @@ class GameProvider extends ChangeNotifier {
           notifyListeners();
           await Future.delayed(const Duration(milliseconds: 250));
 
+          // [FIX] Safety check 2: The most critical one during walking
+          if (isGameOver || pawn.state == PawnState.inBase) {
+            debugPrint(
+              '[ANIMATION ABORTED] Game reset or pawn died during step movement.',
+            );
+            return;
+          }
+
           if (isBulldozerMode && pawn.state == PawnState.onPath) {
             bool intermediateCut = await _attemptCut(
               pawn,
@@ -708,7 +755,6 @@ class GameProvider extends ChangeNotifier {
             );
             if (intermediateCut) cutOpponent = true;
           }
-
           if (pawn.step == 56) {
             Future.delayed(const Duration(milliseconds: 600), () {
               pawn.isWinningAnimation = false;
@@ -766,6 +812,7 @@ class GameProvider extends ChangeNotifier {
   }
 
   /// Checks if [pawn] is on a portal and applies teleportation logic if so.
+  /// Checks if [pawn] is on a portal and applies teleportation logic if so.
   Future<bool> _checkPortalTeleport(Pawn pawn) async {
     final int absolutePos = BoardCoordinates.getAbsolutePosition(pawn);
 
@@ -778,11 +825,10 @@ class GameProvider extends ChangeNotifier {
         lastTeleportedPawn = pawn;
         notifyListeners();
 
-        // 1. Teleport to target absolute position
-        int targetAbsolute = applyPortal(absolutePos, portal);
+        // [FIX] 1. Get the pure exit destination
+        int destAbsolute = portal.getOther(absolutePos);
 
-        // 2. Convert absolute back to relative step
-        // (absolute - colorOffset) % 52
+        // 2. Determine color offset
         int colorOffset = 0;
         switch (pawn.color) {
           case PlayerColor.green:
@@ -799,27 +845,58 @@ class GameProvider extends ChangeNotifier {
             break;
         }
 
-        int newStep = (targetAbsolute - colorOffset + 52) % 52;
+        // 3. Convert exit to relative step FIRST
+        int newStep = (destAbsolute - colorOffset + 52) % 52;
+
+        // [FIX] 4. Apply the modifiers in RELATIVE space so it enters the home stretch properly
+        if (portal.type == PortalType.red) {
+          newStep += 2;
+        } else if (portal.type == PortalType.purple) {
+          newStep -= 2;
+        }
+
+        // [FIX] 5. Clamp bounds to prevent array crashes or infinite loops
+        if (newStep < 0) {
+          newStep += 52; // Wrap backwards around main path
+        } else if (newStep > 56) {
+          newStep = 56; // Cap at center triangle
+        }
 
         // Visual pause before jump
         await Future.delayed(const Duration(milliseconds: 300));
+
+        // Safety check inside teleport (from Bug 6)
+        if (isGameOver || pawn.state == PawnState.inBase) {
+          debugPrint('[TELEPORT ABORTED] Game reset during portal sequence.');
+          return false;
+        }
+
         AudioManager.playPortalTeleport();
 
         pawn.step = newStep;
 
         if (pawn.step >= 51 && pawn.state == PawnState.onPath) {
           pawn.state = PawnState.onHomeStretch;
+
+          // If the portal shot them directly into the center
+          if (pawn.step == 56) {
+            pawn.state = PawnState.finished;
+            _checkWinCondition(pawn.color);
+          }
         }
 
         notifyListeners();
 
         // Clear flash after teleport
         await Future.delayed(const Duration(milliseconds: 500));
+
+        // Safety check before continuing
+        if (isGameOver || pawn.state == PawnState.inBase) return false;
+
         lastTeleportedPawn = null;
         notifyListeners();
 
         // Check for capture at the new location
-
         bool cutOpponent = await _attemptCut(pawn);
         return cutOpponent;
       }
@@ -919,6 +996,7 @@ class GameProvider extends ChangeNotifier {
 
     if (activePlayer.hasWon && !winner.contains(color)) {
       debugPrint(' [WINNER] ${color.name.toUpperCase()} HAS WON THE GAME!');
+      AudioManager.playGameWin();
       winner.add(color);
     }
     if (winner.length >= players.length - 1) {
@@ -942,14 +1020,26 @@ class GameProvider extends ChangeNotifier {
     int a;
     int b;
 
+    // Pick a valid tile for Portal side A
     do {
       a = random.nextInt(52);
-    } while (isRestrictedTile(a));
+    } while (isRestrictedTile(a) ||
+        activePortals.any((p) => p.a == a || p.b == a) ||
+        activePower.any((p) => p.position == a));
+
+    // Pick a valid, non-overlapping tile for Portal side B
     do {
       b = random.nextInt(52);
-    } while (b == a || isRestrictedTile(b));
+    } while (b == a ||
+        isRestrictedTile(b) ||
+        activePortals.any((p) => p.a == b || p.b == b) ||
+        activePower.any((p) => p.position == b));
 
     final type = PortalType.values[random.nextInt(3)];
+
+    // Logging portal spawn using debugPrint as per your control instructions
+    debugPrint('🌀 [SPAWN] Generated portal ${type.name} connecting $a <-> $b');
+
     return Portals(a: a, b: b, type: type);
   }
 

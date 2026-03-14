@@ -1,8 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lottie/lottie.dart';
 import 'package:ludo_game/models/game_models.dart';
 import 'package:ludo_game/screens/player_selection_screen.dart';
+import 'package:ludo_game/utils/audio_manager.dart';
 import 'package:ludo_game/utils/board_coordinates.dart';
 import 'package:ludo_game/widgets/board_painter.dart';
 import 'package:ludo_game/widgets/dice_widget.dart';
@@ -45,57 +48,69 @@ class LudoScreen extends StatelessWidget {
     final winner = context.select<GameProvider, List<PlayerColor>>(
       (p) => p.winner,
     );
-    final allPlayers = context.select<GameProvider, List<PlayerColor>>(
-      (p) => p.players.map((e) => e.color).toList(),
+    final allPlayers = context.select<GameProvider, List<Player>>(
+      (p) => p.players,
+    );
+    final gameSessionId = context.select<GameProvider, int>(
+      (p) => p.gameSessionId,
     );
 
-    return Scaffold(
-      backgroundColor: Colors.white,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (didPop) return;
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
 
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // ─── 1. BACKGROUND IMAGE ───
-          // Static — wrapped in its own widget so it never rebuilds.
-          const _BackgroundLayer(),
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            // ─── 1. BACKGROUND IMAGE ───
+            // Static — wrapped in its own widget so it never rebuilds.
+            const _BackgroundLayer(),
 
-          // ─── 2. BOARD + PAWNS ───
-          // Rebuilds whenever game state changes.
-          const _BoardLayer(),
+            // ─── 2. BOARD + PAWNS ───
+            // Rebuilds whenever game state changes.
+            const _BoardLayer(),
 
-          // ─── 3. DICE OVERLAY ───
-          // Floats to a corner matching the current player using AnimatedAlign.
-          SafeArea(
-            child: AnimatedAlign(
-              // ADJUSTABLE: Change dice slide animation speed here (currently 450 ms).
-              duration: const Duration(milliseconds: 450),
-              curve: Curves.easeInOutBack,
-              alignment: _getDiceAlignment(currentTurn),
-              child: const Padding(
-                // ADJUSTABLE: Change dice padding from screen edge here (currently 10 px).
-                padding: EdgeInsets.all(10),
-                child: RepaintBoundary(child: DiceWidget()),
+            // ─── 3. DICE OVERLAY ───
+            // Floats to a corner matching the current player using AnimatedAlign.
+            SafeArea(
+              child: AnimatedAlign(
+                // ADJUSTABLE: Change dice slide animation speed here (currently 450 ms).
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOutCubic,
+                alignment: _getDiceAlignment(currentTurn),
+                child: const Padding(
+                  // ADJUSTABLE: Change dice padding from screen edge here (currently 10 px).
+                  padding: EdgeInsets.all(10),
+                  child: RepaintBoundary(child: DiceWidget()),
+                ),
               ),
             ),
-          ),
 
-          // ─── 4. SETTINGS MENU ───
-          Positioned(
-            bottom: 10,
-            child: RepaintBoundary(child: _SettingsMenu()),
-          ),
-
-          // ─── 5. VICTORY OVERLAY ───
-          // Covers the entire screen when a winner is determined.
-          // ─── 5. VICTORY OVERLAY ───
-          if (isGameOver)
-            Positioned.fill(
-              child: VictoryOverlay(winners: winner, allPlayers: allPlayers),
+            // ─── 4. SETTINGS MENU ───
+            Positioned(
+              bottom: 10,
+              child: RepaintBoundary(child: _SettingsMenu()),
             ),
 
-          // ─── 6. TELEPORT FLASH ───
-          const _TeleportFlashOverlay(),
-        ],
+            // ─── 5. VICTORY OVERLAY ───
+            // Covers the entire screen when a winner is determined.
+            // ─── 5. VICTORY OVERLAY ───
+            if (isGameOver)
+              Positioned.fill(
+                child: VictoryOverlay(winners: winner, allPlayers: allPlayers),
+              ),
+
+            // ─── 6. TELEPORT FLASH ───
+            const _TeleportFlashOverlay(),
+
+            // ─── 7. GAME START BLINKING ANIMATION ───
+            _GameStartBlinker(key: ValueKey(gameSessionId)),
+          ],
+        ),
       ),
     );
   }
@@ -115,9 +130,9 @@ class LudoScreen extends StatelessWidget {
   Alignment _getDiceAlignment(PlayerColor turn) {
     switch (turn) {
       case PlayerColor.green:
-        return const Alignment(-1, -0.8);
+        return const Alignment(-1, -0.85);
       case PlayerColor.yellow:
-        return const Alignment(1, -0.8);
+        return const Alignment(1, -0.85);
       case PlayerColor.blue:
         return const Alignment(1, 0.7);
       case PlayerColor.red:
@@ -138,7 +153,7 @@ class _BackgroundLayer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Image.asset(
-      'assets/images/bg_image_3.webp',
+      'assets/images/bg_image.webp',
       fit: BoxFit.cover,
       // ADJUSTABLE: Change background image opacity here (currently 0.7).
       opacity: const AlwaysStoppedAnimation(.3),
@@ -244,7 +259,7 @@ class _SettingsMenu extends StatelessWidget {
                   child: Row(
                     children: [
                       Icon(
-                        Icons.person_remove,
+                        Icons.sports_gymnastics,
                         color: Colors.cyanAccent,
                         size: size.width / 20,
                       ),
@@ -453,6 +468,7 @@ class _SettingsMenu extends StatelessWidget {
                                       "Cancel",
                                       style: TextStyle(
                                         fontSize: size.width / 26,
+                                        color: Colors.white,
                                       ),
                                     ),
                                   ),
@@ -462,8 +478,10 @@ class _SettingsMenu extends StatelessWidget {
                                     onPressed: () async {
                                       Navigator.pop(context);
 
-                                      final int? count =
-                                          await Navigator.push<int>(
+                                      final Map<PlayerColor, String>? result =
+                                          await Navigator.push<
+                                            Map<PlayerColor, String>
+                                          >(
                                             context,
                                             MaterialPageRoute(
                                               builder: (_) =>
@@ -471,10 +489,10 @@ class _SettingsMenu extends StatelessWidget {
                                             ),
                                           );
 
-                                      if (count != null && context.mounted) {
+                                      if (result != null && context.mounted) {
                                         context
                                             .read<GameProvider>()
-                                            .initializePlayers(count);
+                                            .initializePlayers(result);
                                       }
                                     },
                                     style: ElevatedButton.styleFrom(
@@ -813,7 +831,12 @@ class _BoardLayer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final gameProvider = context.watch<GameProvider>();
+    final boardSize = MediaQuery.of(context).size;
 
+    //  Fetch the list of removed players
+    final removedPlayers = context.select<GameProvider, List<PlayerColor>>(
+      (p) => p.removedPlayers,
+    );
     debugPrint("BoardLayer rebuild");
 
     return Column(
@@ -862,234 +885,374 @@ class _BoardLayer extends StatelessWidget {
                   positionMap.putIfAbsent(key, () => []).add(pawn);
                 }
 
-                return Stack(
-                  children: [
-                    // ─── 1. BOARD CANVAS ───
-                    // RepaintBoundary prevents the canvas from repainting
-                    // when only pawn positions change.
-                    RepaintBoundary(
-                      child: CustomPaint(
-                        size: boardSize,
-                        painter: LudoBoardPainter(
-                          portals: gameProvider.activePortals,
-                          portalState: gameProvider.activePortals
-                              .map((p) => '${p.a}-${p.b}-${p.remainingTurns}')
-                              .join('|'),
-                          // portalState: gameProvider.activePortals
-                          //     .map((p) => '${p.a}-${p.b}-${p.remainingTurns}')
-                          //     .join('|'),
-                        ),
-                      ),
-                    ),
-
-                    // ─── 1.5 PORTAL WIDGETS (ANIMATED) ───
-                    ...gameProvider.activePortals.expand((portal) {
-                      final Offset posA =
-                          BoardCoordinates.mainPath[portal.a % 52];
-                      final Offset posB =
-                          BoardCoordinates.mainPath[portal.b % 52];
-
-                      final double cellSize = boardSize.width / 15;
-
-                      return [
-                        Positioned(
-                          left: posA.dx * cellSize + (cellSize - 32) / 2,
-                          top: posA.dy * cellSize + (cellSize - 32) / 2,
-                          child: PortalWidget(
-                            type: portal.type,
-                            remainingTurns: portal.remainingTurns,
-                          ),
-                        ),
-                        Positioned(
-                          left: posB.dx * cellSize + (cellSize - 32) / 2,
-                          top: posB.dy * cellSize + (cellSize - 32) / 2,
-                          child: PortalWidget(
-                            type: portal.type,
-                            remainingTurns: portal.remainingTurns,
-                          ),
-                        ),
-                      ];
-                    }),
-
-                    // ─── 1.6 POWER WIDGETS (ANIMATED) ───
-                    ...gameProvider.activePower.map((power) {
-                      final Offset pos =
-                          BoardCoordinates.mainPath[power.position % 52];
-                      final double cellSize = boardSize.width / 15;
-
-                      return Positioned(
-                        left: pos.dx * cellSize + (cellSize - 30) / 2,
-                        top: pos.dy * cellSize + (cellSize - 30) / 2,
-                        child: PowerWidget(type: power.type),
-                      );
-                    }),
-
-                    ...gameProvider.winner.asMap().entries.map((entry) {
-                      final int rank = entry.key + 1;
-                      final PlayerColor color = entry.value;
-
-                      double left = 0;
-                      double top = 0;
-
-                      final double baseSize = boardSize.width * (5 / 15);
-
-                      // determine which color's base is in..
-                      switch (color) {
-                        case PlayerColor.green:
-                          left = 11;
-                          top = 11;
-                          break;
-                        case PlayerColor.yellow:
-                          left = boardSize.width * (9.5 / 15);
-                          top = 11;
-                          break;
-                        case PlayerColor.blue:
-                          left = boardSize.width * (9 / 15);
-                          top = boardSize.width * (9 / 15);
-                          break;
-                        case PlayerColor.red:
-                          left = 0;
-                          top = boardSize.width * (9 / 15);
-                          break;
-                      }
-
-                      Color crownColor;
-                      String rankText;
-                      if (rank == 1) {
-                        crownColor = Colors.amber; // golden crown
-                        rankText = "1st";
-                      } else if (rank == 2) {
-                        crownColor = Colors.grey.shade300; // sliver crown
-                        rankText = "2nd";
-                      } else {
-                        crownColor = const Color(0xFFCD7F32); // Bronze
-                        rankText = "3RD";
-                      }
-
-                      return Positioned(
-                        left: left,
-                        top: top,
-                        width: baseSize,
-                        height: baseSize,
-                        child: IgnorePointer(
-                          child: TweenAnimationBuilder<double>(
-                            curve: Curves.elasticOut,
-                            key: ValueKey('Crown${color.name}'),
-                            tween: Tween(begin: 0.0, end: 1.0),
-                            duration: const Duration(milliseconds: 800),
-                            builder: (context, scale, child) {
-                              return Transform.scale(
-                                scale: scale,
-                                child: child,
-                              );
-                            },
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.4),
-                                shape: BoxShape.circle,
-                              ),
-                              margin: .all(baseSize * 0.15),
-                              child: Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.emoji_events,
-                                      color: crownColor,
-                                      size: baseSize * 0.35,
-                                      shadows: const [
-                                        Shadow(
-                                          color: Colors.black87,
-                                          blurRadius: 6,
-                                        ),
-                                      ],
-                                    ),
-                                    Text(
-                                      rankText,
-                                      style: TextStyle(
-                                        color: crownColor,
-                                        fontSize: baseSize * 0.15,
-                                        fontWeight: FontWeight.bold,
-                                        shadows: const [
-                                          Shadow(
-                                            color: Colors.black87,
-                                            blurRadius: 6,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                return Center(
+                  child: SizedBox(
+                    height: boardSize.width,
+                    width: boardSize.width,
+                    child: Stack(
+                      children: [
+                        // ─── 1. BOARD CANVAS ───
+                        // RepaintBoundary prevents the canvas from repainting
+                        // when only pawn positions change.
+                        RepaintBoundary(
+                          child: CustomPaint(
+                            size: boardSize,
+                            painter: LudoBoardPainter(
+                              portals: gameProvider.activePortals,
+                              portalState: gameProvider.activePortals
+                                  .map(
+                                    (p) => '${p.a}-${p.b}-${p.remainingTurns}',
+                                  )
+                                  .join('|'),
+                              // portalState: gameProvider.activePortals
+                              //     .map((p) => '${p.a}-${p.b}-${p.remainingTurns}')
+                              //     .join('|'),
                             ),
                           ),
                         ),
-                      );
-                    }),
 
-                    // ─── 2. PAWN WIDGETS ───
-                    // Map each pawn to its PawnWidget, then sort so that
-                    // the current player's pawns always render on top (z-order).
-                    ...allPawn.map((pawn) {
-                        final Offset pos = BoardCoordinates.getPhysicalLocation(
-                          boardSize,
-                          pawn,
-                        );
+                        // ─── 1.5 PORTAL WIDGETS (ANIMATED) ───
+                        ...gameProvider.activePortals.expand((portal) {
+                          final Offset posA =
+                              BoardCoordinates.mainPath[portal.a % 52];
+                          final Offset posB =
+                              BoardCoordinates.mainPath[portal.b % 52];
 
-                        final int cellX = (pos.dx / (boardSize.width / 15))
-                            .round();
-                        final int cellY = (pos.dy / (boardSize.height / 15))
-                            .round();
+                          final double cellSize = boardSize.width / 15;
 
-                        final String key = "$cellX-$cellY";
+                          return [
+                            Positioned(
+                              left: posA.dx * cellSize + (cellSize - 32) / 2,
+                              top: posA.dy * cellSize + (cellSize - 32) / 2,
+                              child: PortalWidget(
+                                type: portal.type,
+                                remainingTurns: portal.remainingTurns,
+                              ),
+                            ),
+                            Positioned(
+                              left: posB.dx * cellSize + (cellSize - 32) / 2,
+                              top: posB.dy * cellSize + (cellSize - 32) / 2,
+                              child: PortalWidget(
+                                type: portal.type,
+                                remainingTurns: portal.remainingTurns,
+                              ),
+                            ),
+                          ];
+                        }),
 
-                        final List<Pawn> overlapping =
-                            positionMap[key] ?? [pawn];
-                        final int overlapIndex = overlapping.indexOf(pawn);
-                        final int totalOverlapping = overlapping.length;
+                        // ─── 1.6 POWER WIDGETS (ANIMATED) ───
+                        ...gameProvider.activePower.map((power) {
+                          final Offset pos =
+                              BoardCoordinates.mainPath[power.position % 52];
+                          final double cellSize = boardSize.width / 15;
 
-                        return PawnWidget(
-                          // Stable key prevents unnecessary widget recycling.
-                          key: ValueKey('${pawn.color.name}_${pawn.id}'),
-                          pawn: pawn,
-                          boardSize: boardSize,
-                          isCurrentTurn: gameProvider.currentTurn == pawn.color,
-                          overlapIndex: overlapIndex,
-                          totalOverlapping: totalOverlapping,
-                          onTap: () {
-                            debugPrint("Pawn tapped from board");
-                            gameProvider.movePawn(pawn);
-                          },
-                        );
-                      }).toList()
-                      // ─── Sort: current player's pawns paint last (highest z) ───
-                      ..sort((a, b) {
-                        bool aIsCurrent =
-                            a.pawn.color == gameProvider.currentTurn;
+                          return Positioned(
+                            left: pos.dx * cellSize + (cellSize - 30) / 2,
+                            top: pos.dy * cellSize + (cellSize - 30) / 2,
+                            child: PowerWidget(type: power.type),
+                          );
+                        }),
 
-                        bool bIsCurrent =
-                            b.pawn.color == gameProvider.currentTurn;
+                        ...gameProvider.winner.asMap().entries.map((entry) {
+                          final int rank = entry.key + 1;
+                          final PlayerColor color = entry.value;
 
-                        if (aIsCurrent && !bIsCurrent) return 1;
-                        if (!aIsCurrent && bIsCurrent) return -1;
+                          double left = 0;
+                          double top = 0;
 
-                        return 0;
-                      }),
+                          final double baseSize = boardSize.width * (5 / 15);
 
-                    // ─── 3. WINNING LOTTIE ANIMATION ───
-                    // Shown over the entire board when a pawn reaches the center.
-                    // IgnorePointer ensures it doesn't block pawn taps.
-                    if (isAnyPawnWinning)
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: Lottie.asset(
-                            'assets/animations/triangle_reach.json',
-                            fit: BoxFit.cover,
-                            repeat: false,
+                          // determine which color's base is in..
+                          switch (color) {
+                            case PlayerColor.green:
+                              left = boardSize.width * (0.5 / 15);
+                              top = boardSize.width * (0.5 / 15);
+                              debugPrint(
+                                'Positioning Green Crown responsively at $left, $top',
+                              );
+                              break;
+                            case PlayerColor.yellow:
+                              left = boardSize.width * (9.5 / 15);
+                              top = boardSize.width * (0.5 / 15);
+                              debugPrint(
+                                'Positioning Yellow Crown responsively at $left, $top',
+                              );
+                              break;
+                            case PlayerColor.blue:
+                              left = boardSize.width * (9.5 / 15);
+                              top = boardSize.width * (9.5 / 15);
+                              debugPrint(
+                                'Positioning Blue Crown responsively at $left, $top',
+                              );
+                              break;
+                            case PlayerColor.red:
+                              left = boardSize.width * (0.5 / 15);
+                              top = boardSize.width * (9.5 / 15);
+                              debugPrint(
+                                'Positioning Red Crown responsively at $left, $top',
+                              );
+                              break;
+                          }
+
+                          Color crownColor;
+                          String rankText;
+                          if (rank == 1) {
+                            crownColor = Colors.amber; // golden crown
+                            rankText = "1st";
+                          } else if (rank == 2) {
+                            crownColor = Colors.grey.shade300; // sliver crown
+                            rankText = "2nd";
+                          } else {
+                            crownColor = const Color(0xFFCD7F32); // Bronze
+                            rankText = "3rd";
+                          }
+
+                          return Positioned(
+                            left: left,
+                            top: top,
+                            width: baseSize,
+                            height: baseSize,
+                            child: IgnorePointer(
+                              child: TweenAnimationBuilder<double>(
+                                curve: Curves.elasticOut,
+                                key: ValueKey('Crown${color.name}'),
+                                tween: Tween(begin: 0.0, end: 1.0),
+                                duration: const Duration(milliseconds: 800),
+                                builder: (context, scale, child) {
+                                  return Transform.scale(
+                                    scale: scale,
+                                    child: child,
+                                  );
+                                },
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.4),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  margin: .all(baseSize * 0.15),
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.emoji_events,
+                                          color: crownColor,
+                                          size: baseSize * 0.35,
+                                          shadows: const [
+                                            Shadow(
+                                              color: Colors.black87,
+                                              blurRadius: 6,
+                                            ),
+                                          ],
+                                        ),
+                                        Text(
+                                          rankText,
+                                          style: TextStyle(
+                                            color: crownColor,
+                                            fontSize: baseSize * 0.15,
+                                            fontWeight: FontWeight.bold,
+                                            shadows: const [
+                                              Shadow(
+                                                color: Colors.black87,
+                                                blurRadius: 6,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+
+                        // ─── 2. PAWN WIDGETS ───
+                        // Map each pawn to its PawnWidget, then sort so that
+                        // the current player's pawns always render on top (z-order).
+                        ...allPawn.map((pawn) {
+                            final Offset pos =
+                                BoardCoordinates.getPhysicalLocation(
+                                  boardSize,
+                                  pawn,
+                                );
+
+                            final int cellX = (pos.dx / (boardSize.width / 15))
+                                .round();
+                            final int cellY = (pos.dy / (boardSize.height / 15))
+                                .round();
+
+                            final String key = "$cellX-$cellY";
+
+                            final List<Pawn> overlapping =
+                                positionMap[key] ?? [pawn];
+                            final int overlapIndex = overlapping.indexOf(pawn);
+                            final int totalOverlapping = overlapping.length;
+
+                            return PawnWidget(
+                              // Stable key prevents unnecessary widget recycling.
+                              key: ValueKey('${pawn.color.name}_${pawn.id}'),
+                              pawn: pawn,
+                              boardSize: boardSize,
+                              isCurrentTurn:
+                                  gameProvider.currentTurn == pawn.color,
+                              overlapIndex: overlapIndex,
+                              totalOverlapping: totalOverlapping,
+                              onTap: () {
+                                debugPrint("Pawn tapped from board");
+                                gameProvider.movePawn(pawn);
+                              },
+                            );
+                          }).toList()
+                          // ─── Sort: current player's pawns paint last (highest z) ───
+                          ..sort((a, b) {
+                            bool aIsCurrent =
+                                a.pawn.color == gameProvider.currentTurn;
+
+                            bool bIsCurrent =
+                                b.pawn.color == gameProvider.currentTurn;
+
+                            if (aIsCurrent && !bIsCurrent) return 1;
+                            if (!aIsCurrent && bIsCurrent) return -1;
+
+                            return 0;
+                          }),
+
+                        // ─── 3. WINNING LOTTIE ANIMATION ───
+                        // Shown over the entire board when a pawn reaches the center.
+                        // IgnorePointer ensures it doesn't block pawn taps.
+                        if (isAnyPawnWinning)
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: Lottie.asset(
+                                'assets/animations/triangle_reach.json',
+                                fit: BoxFit.cover,
+                                repeat: false,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                  ],
+
+                        // -- player names-----
+                        ...gameProvider.players.map((player) {
+                          double padding = boardSize.width * 0;
+                          bool shouldFlip =
+                              player.color == PlayerColor.green ||
+                              player.color == PlayerColor.yellow;
+                          return Positioned(
+                            left:
+                                (player.color == PlayerColor.green ||
+                                    player.color == PlayerColor.red)
+                                ? padding
+                                : null,
+                            right:
+                                (player.color == PlayerColor.yellow ||
+                                    player.color == PlayerColor.blue)
+                                ? padding
+                                : null,
+                            top:
+                                (player.color == PlayerColor.green ||
+                                    player.color == PlayerColor.yellow)
+                                ? padding
+                                : null,
+                            bottom:
+                                (player.color == PlayerColor.red ||
+                                    player.color == PlayerColor.blue)
+                                ? padding
+                                : null,
+                            child: Transform.rotate(
+                              angle: shouldFlip ? math.pi : 0,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withAlpha(230),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: Colors.black54,
+                                    width: 1.5,
+                                  ),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Colors.black26,
+                                      blurRadius: 4,
+                                    ),
+                                  ],
+                                ),
+                                child: Text(
+                                  player.name,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize:
+                                        boardSize.width *
+                                        0.030, // Scales dynamically
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                        ...removedPlayers.map((color) {
+                          // A player base is exactly 6/15ths of the total board width.
+                          double baseSize = boardSize.width * (6 / 15);
+                          double? left, right, top, bottom;
+
+                          // Snap the container to the exact corner of the removed player's base
+                          switch (color) {
+                            case PlayerColor.green:
+                              left = 0;
+                              top = 0;
+                              break;
+                            case PlayerColor.yellow:
+                              right = 0;
+                              top = 0;
+                              break;
+                            case PlayerColor.blue:
+                              right = 0;
+                              bottom = 0;
+                              break;
+                            case PlayerColor.red:
+                              left = 0;
+                              bottom = 0;
+                              break;
+                          }
+
+                          return Positioned(
+                            left: left,
+                            right: right,
+                            top: top,
+                            bottom: bottom,
+                            width: baseSize,
+                            height: baseSize,
+                            child: Center(
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withAlpha(160),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white54,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Icon(
+                                  Icons
+                                      .person_off_rounded, // The "removed" icon
+                                  color: Colors.white,
+                                  size:
+                                      baseSize *
+                                      0.35, // Scales perfectly with the board
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
                 );
               },
             ),
@@ -1098,25 +1261,12 @@ class _BoardLayer extends StatelessWidget {
         SizedBox(height: 20),
         // ─── PASS TURN BUTTON ───
         // Allows the current player to manually skip their turn.
-        // ─── ACTION BUTTONS (PASS TURN & POWERS) ───
+        // ─── ACTION BUTTONS (POWERS) ───
         SizedBox(
           width: double.infinity,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // 1. Pass Turn Button
-              ElevatedButton(
-                onPressed: () {
-                  debugPrint("Pass turn pressed");
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white.withValues(alpha: 0.9),
-                  foregroundColor: Colors.black,
-                  elevation: 4,
-                ),
-                child: const Text('Pass Turn'),
-              ),
-
               // 2. Reverse Power Button (Only shows if current player has the power)
               if (gameProvider.players
                   .firstWhere((p) => p.color == gameProvider.currentTurn)
@@ -1181,6 +1331,102 @@ class _TeleportFlashOverlay extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         opacity: 0.3,
         child: Container(color: Colors.white),
+      ),
+    );
+  }
+}
+// ==============================
+// GAME START BLINKER
+// A brief, non-blocking text overlay that blinks "GAME STARTS"
+// in the center of the board when a new session begins.
+// ==============================
+
+class _GameStartBlinker extends StatefulWidget {
+  const _GameStartBlinker({super.key});
+
+  @override
+  State<_GameStartBlinker> createState() => _GameStartBlinkerState();
+}
+
+class _GameStartBlinkerState extends State<_GameStartBlinker>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  bool _isVisible = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 330),
+    );
+    _playAnimation();
+  }
+
+  Future<void> _playAnimation() async {
+    debugPrint('[ANIMATION] Playing "Game Starts" blink sequence');
+    AudioManager.playGameStart();
+    // Blink 3 times
+    for (int i = 0; i < 5; i++) {
+      if (!mounted) return;
+      await _controller.forward();
+      if (!mounted) return;
+      await _controller.reverse();
+    }
+
+    // Hide widget completely after sequence
+    if (mounted) {
+      setState(() {
+        _isVisible = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_isVisible) return const SizedBox.shrink();
+
+    // [FIX]: Positioned.fill + AbsorbPointer creates an invisible shield
+    // over the entire screen that blocks ALL taps (dice, pawns, settings)
+    // until the animation finishes and _isVisible becomes false.
+    return Positioned.fill(
+      child: AbsorbPointer(
+        absorbing: true,
+        child: Center(
+          child: FadeTransition(
+            opacity: Tween<double>(begin: 1.0, end: 0.0).animate(_controller),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.85),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.amber, width: 2),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black54,
+                    blurRadius: 10,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: const Text(
+                "GAME STARTS",
+                style: TextStyle(
+                  color: Colors.amber,
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 2,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -8,7 +8,7 @@ import 'package:audioplayers/audioplayers.dart';
 // Uses two separate AudioPlayer instances to allow concurrent playback
 // (e.g., a safe-zone sound can play alongside a movement sound).
 //
-// All sounds are loaded from the assets/ directory via AssetSource.
+// All misc_sounds are loaded from the assets/ directory via AssetSource.
 // ==============================
 
 /// Handles all game sound effects.
@@ -25,8 +25,8 @@ class AudioManager {
   /// Stopped and restarted on each new sound to avoid overlap.
   static final AudioPlayer _effectPlayer = AudioPlayer();
 
-  /// Separate player dedicated to safe-zone landing sounds.
-  /// Kept separate so it never interrupts movement or knockout sounds.
+  /// Separate player dedicated to safe-zone landing misc_sounds.
+  /// Kept separate so it never interrupts movement or knockout misc_sounds.
   static final AudioPlayer _safeZonePlayer = AudioPlayer();
 
   // ==============================
@@ -38,11 +38,11 @@ class AudioManager {
 
   /// Sounds played when a pawn kills (captures) another pawn.
   static const List<String> knockOutSounds = [
-    'kill_Sound/abe-sale.wav',
+    'kill_Sound/abe_sale.wav',
     'kill_Sound/bone_crack.wav',
     'kill_Sound/anime_ahh.wav',
-    'kill_Sound/cat-laugh.wav',
-    'kill_Sound/gopgopgop.wav',
+    'kill_Sound/cat_laugh.wav',
+    'kill_Sound/gop_gop_gop.wav',
     'kill_Sound/khatam.wav',
     'kill_Sound/ramayan_gayab.wav',
     'kill_Sound/tehelka_omlette.wav',
@@ -51,27 +51,44 @@ class AudioManager {
   /// Sounds played when a pawn exits the base (rolled a 6).
   static const List<String> baseExitSounds = [
     'entry/faaah.wav',
-    'entry/chaloo.wav',
+    "entry/chaloo.wav",
+    "entry/dun_dun_dun.wav",
   ];
 
   /// Sound played each time a pawn moves one step forward on the path.
-  static const List<String> pawnMovementSound = ['sounds/pawn_move.wav'];
+  static const List<String> pawnMovementSound = ['misc_sounds/pawn_move.wav'];
 
   /// Sound played when the dice is rolled.
-  static const List<String> diceRollSound = ['sounds/dice_roll.wav'];
+  static const List<String> diceRollSound = ['misc_sounds/dice_roll.wav'];
 
   /// Sound played when a pawn lands on a safe zone cell.
-  static const List<String> safeHouseSound = ['sounds/mac_quack.wav'];
+  static const List<String> safeHouseSound = ['misc_sounds/safe_zones.wav'];
+
+  /// Sounds played when game is won
+  static const List<String> gameWinSound = ['misc_sounds/game_win_sound.wav'];
+
+  /// Sounds played when game is won
+  static const List<String> passTurnSound = ['misc_sounds/pass_turn.wav'];
 
   /// Sound played when a pawn is teleported through a portal.
-  /// Reuses the triangle_reach asset for a distinct "whoosh" feel.
   static const List<String> portalTeleportSound = [
     'entry/spiderman.wav',
     'entry/yooooooooooooooooooo.wav',
   ];
 
   /// Sound played when a pawn reaches the center winning triangle.
-  static const List<String> triangleReachSound = ['sounds/triangle_reach.wav'];
+  static const List<String> triangleReachSound = [
+    'misc_sounds/triangle_reach.wav',
+  ];
+  // Sound plays when game starts..
+  static const List<String> gameStartSound = [
+    'misc_sounds/game_start.wav',
+    'misc_sounds/game_start2.wav',
+  ];
+  // Sound plays when any player is removed..
+  static const List<String> removePlayerSound = [
+    'misc_sounds/remove_player.wav',
+  ];
 
   // ==============================
   // INITIALIZATION
@@ -80,7 +97,7 @@ class AudioManager {
   /// Initializes both audio players in low-latency mode.
   ///
   /// Must be called once in [main()] before [runApp()] to ensure
-  /// sounds play without noticeable delay during gameplay.
+  /// misc_sounds play without noticeable delay during gameplay.
   static Future<void> init() async {
     await _effectPlayer.setPlayerMode(PlayerMode.lowLatency);
     await _effectPlayer.setReleaseMode(ReleaseMode.stop);
@@ -112,6 +129,9 @@ class AudioManager {
   /// Plays a random knockout sound when a pawn captures another pawn.
   static Future<void> playKnockOut() => _playRandom(knockOutSounds);
 
+  /// Plays a random knockout sound when a pawn captures another pawn.
+  static Future<void> playPassTurn() => _playRandom(passTurnSound);
+
   /// Plays a random entry sound when a pawn exits the base.
   static Future<void> playBaseExit() => _playRandom(baseExitSounds);
 
@@ -127,6 +147,15 @@ class AudioManager {
   /// Plays the portal teleport sound when a pawn is instantly teleported.
   static Future<void> playPortalTeleport() => _playRandom(portalTeleportSound);
 
+  /// Plays the game start sound when the game starts.
+  static Future<void> playGameStart() => _playRandom(gameStartSound);
+
+  /// Plays the game win sound when the game is won.
+  static Future<void> playGameWin() => _playRandom(gameWinSound);
+
+  // Plays when any player is reomved.
+  static Future<void> playRemovePlayer() => _playRandom(removePlayerSound);
+
   // ==============================
   // SAFE ZONE SOUND (SEPARATE PLAYER)
   // ==============================
@@ -134,7 +163,7 @@ class AudioManager {
   /// Plays the safe-house landing sound using the dedicated [_safeZonePlayer].
   ///
   /// Uses a separate player so this sound does not interrupt the movement
-  /// or knockout sounds that may be playing simultaneously.
+  /// or knockout misc_sounds that may be playing simultaneously.
   static Future<void> playSafeHouse() async {
     if (safeHouseSound.isEmpty) return;
 

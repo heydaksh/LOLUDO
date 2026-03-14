@@ -52,8 +52,6 @@ class _PowerWidgetState extends State<PowerWidget>
 
   IconData _getIcon() {
     switch (widget.type) {
-      case PowerType.freeze:
-        return Icons.ac_unit;
       case PowerType.shield:
         return Icons.shield;
       case PowerType.reverse:
@@ -67,8 +65,6 @@ class _PowerWidgetState extends State<PowerWidget>
 
   Color _getColor() {
     switch (widget.type) {
-      case PowerType.freeze:
-        return Colors.cyan;
       case PowerType.shield:
         return Colors.orange;
       case PowerType.reverse:

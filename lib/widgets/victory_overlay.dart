@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 
 class VictoryOverlay extends StatefulWidget {
   final List<PlayerColor> winners;
-  final List<PlayerColor> allPlayers;
+  final List<Player> allPlayers;
 
   const VictoryOverlay({
     super.key,
@@ -38,7 +38,7 @@ class _VictoryOverlayState extends State<VictoryOverlay>
     final size = MediaQuery.of(context).size;
 
     final loser = widget.allPlayers.firstWhere(
-      (p) => !widget.winners.contains(p),
+      (p) => !widget.winners.contains(p.color),
       orElse: () => widget.allPlayers.last,
     );
 
@@ -71,7 +71,7 @@ class _VictoryOverlayState extends State<VictoryOverlay>
             child: SizedBox(
               height: size.height / 5,
               child: Lottie.asset(
-                "assets/animations/Trophy Champion Animation.json",
+                "assets/animations/victory_trophy.json",
                 repeat: false,
                 frameRate: FrameRate(120),
                 animate: true,
@@ -145,7 +145,7 @@ class _VictoryOverlayState extends State<VictoryOverlay>
                           _buildRankCard(
                             size,
                             widget.allPlayers.length,
-                            loser,
+                            loser.color,
                             isLoser: true,
                           ),
                         ],
@@ -182,17 +182,18 @@ class _VictoryOverlayState extends State<VictoryOverlay>
                       SizedBox(height: 10),
                       ElevatedButton(
                         onPressed: () async {
-                          Navigator.pop(context);
-                          final int? count = await Navigator.push<int>(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const PlayerSelectionScreen(),
-                            ),
-                          );
-                          // Re-initialize the game with the newly chosen player count.
-                          if (count != null && context.mounted) {
+                          final Map<PlayerColor, String>? result =
+                              await Navigator.push<Map<PlayerColor, String>>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const PlayerSelectionScreen(),
+                                ),
+                              );
+                          // Re-initialize the game with the newly chosen players/names.
+                          if (result != null && context.mounted) {
+                            context.read<GameProvider>().restartGame();
                             context.read<GameProvider>().initializePlayers(
-                              count,
+                              result,
                             );
                           }
                         },
@@ -230,6 +231,8 @@ class _VictoryOverlayState extends State<VictoryOverlay>
 
   /// TOP WINNER
   Widget _buildWinner(Size size, PlayerColor color) {
+    String name = widget.allPlayers.firstWhere((p) => p.color == color).name;
+
     return Column(
       children: [
         Icon(Icons.emoji_events, size: size.width / 6, color: Colors.amber),
@@ -237,7 +240,7 @@ class _VictoryOverlayState extends State<VictoryOverlay>
         SizedBox(height: size.height / 80),
 
         Text(
-          "${color.name.toUpperCase()} WINS!",
+          "$name WINS!",
           style: TextStyle(
             fontSize: size.width / 18,
             fontWeight: FontWeight.bold,
@@ -248,6 +251,7 @@ class _VictoryOverlayState extends State<VictoryOverlay>
     );
   }
 
+  /// RANK CARD
   /// RANK CARD
   Widget _buildRankCard(
     Size size,
@@ -272,6 +276,8 @@ class _VictoryOverlayState extends State<VictoryOverlay>
     }
 
     if (isLoser) rankText = "LOSS";
+
+    String name = widget.allPlayers.firstWhere((p) => p.color == color).name;
 
     return Container(
       margin: EdgeInsets.symmetric(vertical: size.height / 120),
@@ -309,7 +315,7 @@ class _VictoryOverlayState extends State<VictoryOverlay>
               SizedBox(width: size.width / 30),
 
               Text(
-                color.name.toUpperCase(),
+                name, // Display dynamic name instead of color uppercase
                 style: TextStyle(
                   fontSize: size.width / 24,
                   fontWeight: FontWeight.bold,

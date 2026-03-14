@@ -1,6 +1,7 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'package:flutter/material.dart';
+import 'package:ludo_game/models/game_models.dart';
 import 'package:ludo_game/providers/game_provider.dart';
 import 'package:ludo_game/screens/instructions_screen.dart';
 import 'package:ludo_game/screens/start_screen.dart';
@@ -89,16 +90,16 @@ class _StartGameRouterState extends State<_StartGameRouter> {
       // preventing Navigator calls during the initial build phase.
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         // Push the player selection screen and wait for the player count result.
-        final int? players = await Navigator.push(
+        final Map<PlayerColor, String>? playersData = await Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const StartScreen()),
         );
 
-        debugPrint("Selected players: $players");
+        debugPrint("Selected players: $playersData");
 
         // If the user confirmed a player count, configure the game accordingly.
-        if (players != null) {
-          context.read<GameProvider>().initializePlayers(players);
+        if (playersData != null) {
+          context.read<GameProvider>().initializePlayers(playersData);
         }
 
         // Replace this router with the main game screen.

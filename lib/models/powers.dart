@@ -1,4 +1,4 @@
-enum PowerType { freeze, shield, reverse, multiplier, swap }
+enum PowerType { shield, reverse, multiplier, swap }
 
 class Power {
   final int position;

@@ -220,7 +220,12 @@ class _DiceWidgetState extends State<DiceWidget> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    // Subscribe only to the 5 relevant fields to avoid full-widget rebuilds.
+    final size = MediaQuery.of(context).size;
+
+    // dice responsive size
+    final double diceWidth = size.width / 5.5;
+    final double diceHeight = size.width / 7;
+
     final state = context.select<GameProvider, _DiceState>(
       (p) => (
         isDiceRolling: p.isDiceRolling,
@@ -232,15 +237,12 @@ class _DiceWidgetState extends State<DiceWidget> with TickerProviderStateMixin {
       ),
     );
 
-    // True only when the dice is idle and waiting to be tapped.
     final bool shouldBounce =
         !state.isDiceRolling &&
         !state.hasRolled &&
         !state.hasWinner &&
         !state.isAnimatingMove;
 
-    // ─── Turn Color ───
-    // The dice border glows in the current player's color.
     Color turnColor;
     switch (state.currentTurn) {
       case PlayerColor.green:
@@ -264,18 +266,12 @@ class _DiceWidgetState extends State<DiceWidget> with TickerProviderStateMixin {
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
-        // Only allow rolling when the dice is in its idle/bouncing state.
         if (shouldBounce) {
           _startRollingAnimation(context.read<GameProvider>());
         }
       },
-
-      // ─── FLIP FOR OPPOSITE PLAYERS ───
-      // Inverts the dice 180deg so players sitting across (Green & Yellow) can read it easily.
       child: Transform.rotate(
         angle: shouldFlip ? math.pi : 0,
-        // ─── BOUNCE LAYER ───
-        // Translates the entire dice up/down using _bounceAnimation value.
         child: AnimatedBuilder(
           animation: _bounceAnimation,
           builder: (context, child) {
@@ -284,17 +280,11 @@ class _DiceWidgetState extends State<DiceWidget> with TickerProviderStateMixin {
               child: child,
             );
           },
-
-          // ─── 3-D ROTATION LAYER ───
-          // Applies a perspective-correct X+Y rotation during the roll animation.
           child: AnimatedBuilder(
             animation: _rotateAnimation,
             builder: (context, child) {
               final double value = _rotateAnimation.value;
 
-              // perspective + X-axis + Y-axis (0.7× speed for natural feel)
-              // ADJUSTABLE: Change perspective depth here (currently 0.0014).
-              // ADJUSTABLE: Change Y-axis rotation ratio here (currently value * 0.7).
               final Matrix4 transform = Matrix4.identity()
                 ..setEntry(3, 2, 0.0014)
                 ..rotateX(value)
@@ -305,43 +295,34 @@ class _DiceWidgetState extends State<DiceWidget> with TickerProviderStateMixin {
                 transform: transform,
                 child: Transform(
                   alignment: Alignment.center,
-                  // Flip Y-axis halfway through the spin to create a "flip" effect.
                   transform: Matrix4.rotationY(value > math.pi ? math.pi : 0),
                   child: child,
                 ),
               );
             },
-
-            // ─── DICE FACE ───
             child: Container(
-              // ADJUSTABLE: Change dice container width here (currently 70 px).
-              width: 70,
-              // ADJUSTABLE: Change dice container height here (currently 60 px).
-              height: 60,
+              width: diceWidth,
+              height: diceHeight,
               decoration: BoxDecoration(
                 color: Colors.white,
-                // ADJUSTABLE: Change dice corner radius here (currently 16).
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(size.width / 25),
                 boxShadow: [
                   BoxShadow(
                     color: turnColor.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(2, 4),
+                    blurRadius: size.width / 45,
+                    offset: Offset(size.width / 200, size.width / 120),
                   ),
                 ],
                 border: Border.all(
-                  // Border shows turn color when idle, dims to black54 after rolling.
                   color: state.hasRolled ? Colors.black54 : turnColor,
-                  // ADJUSTABLE: Change idle border width here (currently 3 px when idle, 2 px after roll).
-                  width: state.hasRolled ? 2 : 3,
+                  width: state.hasRolled ? size.width / 200 : size.width / 160,
                 ),
               ),
               child: Center(
                 child: Text(
                   '$_displayValue',
-                  style: const TextStyle(
-                    // ADJUSTABLE: Change dice number font size here (currently 40).
-                    fontSize: 40,
+                  style: TextStyle(
+                    fontSize: size.width / 9,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
