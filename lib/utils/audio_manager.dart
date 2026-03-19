@@ -46,6 +46,7 @@ class AudioManager {
     'kill_Sound/khatam.wav',
     'kill_Sound/ramayan_gayab.wav',
     'kill_Sound/tehelka_omlette.wav',
+    'kill_Sound/laugh.wav',
   ];
 
   /// Sounds played when a pawn exits the base (rolled a 6).
@@ -82,6 +83,7 @@ class AudioManager {
   ];
   // Sound plays when game starts..
   static const List<String> gameStartSound = [
+    'misc_sounds/game_start3.wav',
     'misc_sounds/game_start.wav',
     'misc_sounds/game_start2.wav',
   ];

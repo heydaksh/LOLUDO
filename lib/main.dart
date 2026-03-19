@@ -90,7 +90,7 @@ class _StartGameRouterState extends State<_StartGameRouter> {
       // preventing Navigator calls during the initial build phase.
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         // Push the player selection screen and wait for the player count result.
-        final Map<PlayerColor, String>? playersData = await Navigator.push(
+        final Map<PlayerColor, PlayerSetup>? playersData = await Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const StartScreen()),
         );

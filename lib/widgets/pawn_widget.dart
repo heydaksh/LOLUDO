@@ -318,9 +318,9 @@ class _PawnWidgetState extends State<PawnWidget> with TickerProviderStateMixin {
                         child: Transform(
                           alignment: Alignment.center,
                           transform: Matrix4.diagonal3Values(
-                            1.0, 
-                            _stretch.value, 
-                            1.0
+                            1.0,
+                            _stretch.value,
+                            1.0,
                           ),
 
                           // ─── PAWN VISUAL STACK ───
@@ -376,6 +376,34 @@ class _PawnWidgetState extends State<PawnWidget> with TickerProviderStateMixin {
                                             ),
                                         blurRadius: 15 * _glowAnimation.value,
                                         spreadRadius: 3 * _glowAnimation.value,
+                                      ),
+
+                                    // Token glows when super powered.
+                                    if (widget.pawn.hasReverse)
+                                      BoxShadow(
+                                        color:
+                                            widget.pawn.state ==
+                                                PawnState.onHomeStretch
+                                            ? Colors.transparent
+                                            : Colors.purpleAccent.withValues(
+                                                alpha: 0.9,
+                                              ),
+                                        blurRadius: 12,
+                                        spreadRadius: 4,
+                                      ),
+
+                                    // when shielded
+                                    if (widget.pawn.isShielded)
+                                      BoxShadow(
+                                        color:
+                                            widget.pawn.state ==
+                                                PawnState.onHomeStretch
+                                            ? Colors.transparent
+                                            : Colors.cyanAccent.withValues(
+                                                alpha: 0.9,
+                                              ),
+                                        blurRadius: 12,
+                                        spreadRadius: 4,
                                       ),
                                   ],
                                 ),
@@ -474,6 +502,38 @@ class _PawnWidgetState extends State<PawnWidget> with TickerProviderStateMixin {
                                         ),
                                       ),
                                     ),
+
+                                    // -- SUPER POWER ICONS ---
+                                    if (widget.pawn.hasReverse)
+                                      Positioned(
+                                        bottom: pawnSize * 0.85,
+                                        child: Icon(
+                                          Icons.u_turn_left,
+                                          color: Colors.purpleAccent,
+                                          size: pawnSize * 0.5,
+                                          shadows: const [
+                                            Shadow(
+                                              color: Colors.black,
+                                              blurRadius: 4,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    if (widget.pawn.isShielded)
+                                      Positioned(
+                                        bottom: pawnSize * 0.85,
+                                        child: Icon(
+                                          Icons.shield,
+                                          color: Colors.cyanAccent,
+                                          size: pawnSize * 0.5,
+                                          shadows: const [
+                                            Shadow(
+                                              color: Colors.black,
+                                              blurRadius: 4,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                   ],
                                 ),
                               ),

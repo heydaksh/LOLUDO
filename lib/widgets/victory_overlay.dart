@@ -182,8 +182,10 @@ class _VictoryOverlayState extends State<VictoryOverlay>
                       SizedBox(height: 10),
                       ElevatedButton(
                         onPressed: () async {
-                          final Map<PlayerColor, String>? result =
-                              await Navigator.push<Map<PlayerColor, String>>(
+                          final Map<PlayerColor, PlayerSetup>? result =
+                              await Navigator.push<
+                                Map<PlayerColor, PlayerSetup>
+                              >(
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) => const PlayerSelectionScreen(),

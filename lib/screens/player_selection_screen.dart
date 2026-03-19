@@ -21,6 +21,7 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
     TextEditingController(text: "Red"),
   ];
 
+  final List<bool> _isBotList = [false, true, true, true];
   @override
   void dispose() {
     for (var controller in _nameControllers) {
@@ -51,20 +52,31 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
       );
       return;
     }
-
-    Map<PlayerColor, String> selectedData = {};
+    Map<PlayerColor, PlayerSetup> selectedData = {};
 
     if (selectedPlayers[0]) {
-      selectedData[PlayerColor.green] = _nameControllers[0].text;
+      selectedData[PlayerColor.green] = PlayerSetup(
+        name: _nameControllers[0].text,
+        isBot: _isBotList[0],
+      );
     }
     if (selectedPlayers[1]) {
-      selectedData[PlayerColor.yellow] = _nameControllers[1].text;
+      selectedData[PlayerColor.yellow] = PlayerSetup(
+        name: _nameControllers[1].text,
+        isBot: _isBotList[1],
+      );
     }
     if (selectedPlayers[2]) {
-      selectedData[PlayerColor.blue] = _nameControllers[2].text;
+      selectedData[PlayerColor.blue] = PlayerSetup(
+        name: _nameControllers[2].text,
+        isBot: _isBotList[2],
+      );
     }
     if (selectedPlayers[3]) {
-      selectedData[PlayerColor.red] = _nameControllers[3].text;
+      selectedData[PlayerColor.red] = PlayerSetup(
+        name: _nameControllers[3].text,
+        isBot: _isBotList[3],
+      );
     }
 
     Navigator.pop(context, selectedData);
@@ -139,6 +151,19 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
               color: active ? Colors.black : Colors.grey.shade600,
             ),
             decoration: InputDecoration(
+              suffixIcon: GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  setState(() {
+                    _isBotList[index] = !_isBotList[index];
+                  });
+                },
+                child: Icon(
+                  _isBotList[index] ? Icons.smart_toy_outlined : Icons.person,
+                  color: active ? color : Colors.grey,
+                  size: size.width / 20,
+                ),
+              ),
               isDense: true,
               contentPadding: EdgeInsets.symmetric(
                 vertical: size.height / 140,

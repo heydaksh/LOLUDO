@@ -41,8 +41,8 @@ class StartScreen extends StatelessWidget {
               child: Center(
                 child: ElevatedButton(
                   onPressed: () async {
-                    final Map<PlayerColor, String>? result =
-                        await Navigator.push<Map<PlayerColor, String>>(
+                    final Map<PlayerColor, PlayerSetup>? result =
+                        await Navigator.push<Map<PlayerColor, PlayerSetup>>(
                           context,
                           MaterialPageRoute(
                             builder: (context) => const PlayerSelectionScreen(),
