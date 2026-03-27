@@ -60,7 +60,7 @@ extension GameProviderPower on GameProvider {
 
       case PowerType.swap:
         List<Pawn> activeEnemies = players
-            .where((p) => p.color != pawn.color)
+            .where((p) => p.color != pawn.color && isPlayerInGame(p.color))
             .expand((p) => p.pawns)
             .where((p) {
               if (p.state != PawnState.onPath) return false;

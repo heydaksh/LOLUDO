@@ -9,7 +9,7 @@ class AppConfig {
   static const Duration diceBounceDuration = Duration(milliseconds: 200);
 
   /// Duration of the 3D spin rotation when the dice is rolled.
-  static const Duration diceSpinDuration = Duration(milliseconds: 600);
+  static const Duration diceSpinDuration = Duration(milliseconds: 650);
 
   /// How fast the dice faces shuffle (change values) while rolling.
   static const Duration diceFaceShuffleInterval = Duration(milliseconds: 50);

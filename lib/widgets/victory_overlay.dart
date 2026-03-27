@@ -4,16 +4,17 @@ import 'package:ludo_game/models/game_models.dart';
 import 'package:ludo_game/providers/game_provider.dart';
 import 'package:ludo_game/screens/start_screen.dart';
 import 'package:ludo_game/utils/app_config.dart';
+import 'package:ludo_game/utils/audio_manager.dart';
 import 'package:provider/provider.dart';
 
 class VictoryOverlay extends StatefulWidget {
-  final List<PlayerColor> winners;
   final List<Player> allPlayers;
+  final List<PlayerColor> winners;
 
   const VictoryOverlay({
     super.key,
-    required this.winners,
     required this.allPlayers,
+    required this.winners,
   });
 
   @override
@@ -37,21 +38,33 @@ class _VictoryOverlayState extends State<VictoryOverlay>
   @override
   void dispose() {
     _controller.dispose();
+    AudioManager.stopAllSounds();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final isOnline = context.read<GameProvider>().isOnlineMultiplayer;
 
     if (widget.allPlayers.isEmpty || widget.winners.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final loser = widget.allPlayers.firstWhere(
-      (p) => !widget.winners.contains(p.color),
-      orElse: () => widget.allPlayers.last,
+    // 1. Determine if this was a win by default (Opponent quit)
+    bool isDefaultWin = false;
+    final topWinner = widget.allPlayers.firstWhere(
+      (p) => p.color == widget.winners.first,
+      orElse: () => widget.allPlayers.first,
     );
+    // If the winner hasn't actually finished all their pawns, they won by default!
+    if (!topWinner.hasWon) {
+      isDefaultWin = true;
+    }
+
+    final losers = widget.allPlayers
+        .where((p) => !widget.winners.contains(p.color))
+        .toList();
 
     return Container(
       width: size.width,
@@ -60,20 +73,17 @@ class _VictoryOverlayState extends State<VictoryOverlay>
       child: Stack(
         alignment: Alignment.center,
         children: [
-          /// LOTTIE
+          /// LOTTIE ANIMATIONS
           Positioned(
             top: size.height / 12,
             child: Container(
               height: 100,
               width: 100,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                // color: Colors.red,
-              ),
+              decoration: const BoxDecoration(shape: BoxShape.circle),
               child: Lottie.asset(
                 "assets/animations/triangle_reach.json",
                 repeat: true,
-                frameRate: FrameRate(120),
+                frameRate: const FrameRate(120),
               ),
             ),
           ),
@@ -84,7 +94,7 @@ class _VictoryOverlayState extends State<VictoryOverlay>
               child: Lottie.asset(
                 "assets/animations/victory_trophy.json",
                 repeat: false,
-                frameRate: FrameRate(120),
+                frameRate: const FrameRate(120),
                 animate: true,
               ),
             ),
@@ -128,23 +138,25 @@ class _VictoryOverlayState extends State<VictoryOverlay>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      /// TITLE
+                      /// DYNAMIC TITLE
                       Text(
-                        "VICTORY!",
+                        isDefaultWin ? "MATCH ENDED" : "VICTORY!",
                         style: TextStyle(
-                          fontSize: size.width / 10,
+                          fontSize: size.width / 15,
                           fontWeight: FontWeight.bold,
-                          color: Colors.orange.shade800,
+                          color: isDefaultWin
+                              ? Colors.red.shade800
+                              : Colors.orange.shade800,
                         ),
                       ),
 
-                      SizedBox(height: 5),
+                      const SizedBox(height: 5),
 
                       /// WINNER
                       if (widget.winners.isNotEmpty)
-                        _buildWinner(size, widget.winners.first),
+                        _buildWinner(size, widget.winners.first, isDefaultWin),
 
-                      SizedBox(height: 10),
+                      const SizedBox(height: 10),
 
                       /// RANK LIST
                       Column(
@@ -157,49 +169,54 @@ class _VictoryOverlayState extends State<VictoryOverlay>
                               widget.winners[index],
                             ),
                           ),
-
-                          _buildRankCard(
-                            size,
-                            widget.allPlayers.length,
-                            loser.color,
-                            isLoser: true,
+                          ...losers.map(
+                            (loser) => _buildRankCard(
+                              size,
+                              widget.allPlayers.length,
+                              loser.color,
+                              isLoser: true,
+                              isDefaultWin: isDefaultWin,
+                            ),
                           ),
                         ],
                       ),
 
-                      SizedBox(height: 20),
+                      const SizedBox(height: 20),
 
-                      /// PLAY AGAIN BUTTON
-                      ElevatedButton(
-                        onPressed: () {
-                          context.read<GameProvider>().restartGame();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _getColor(
-                            widget.winners.isNotEmpty
-                                ? widget.winners.first
-                                : PlayerColor.green,
+                      /// PLAY AGAIN BUTTON (Offline Only)
+                      if (!isOnline) ...[
+                        ElevatedButton(
+                          onPressed: () {
+                            context.read<GameProvider>().restartGame();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _getColor(
+                              widget.winners.isNotEmpty
+                                  ? widget.winners.first
+                                  : PlayerColor.green,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                size.width / 10,
+                              ),
+                            ),
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                              size.width / 10,
+                          child: Text(
+                            "PLAY AGAIN",
+                            style: TextStyle(
+                              fontSize: size.width / 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
                             ),
                           ),
                         ),
-                        child: Text(
-                          "PLAY AGAIN",
-                          style: TextStyle(
-                            fontSize: size.width / 22,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 10),
+                        const SizedBox(height: 10),
+                      ],
+
+                      /// EXIT BUTTON
                       ElevatedButton(
                         onPressed: () {
                           context.read<GameProvider>().exitGame();
-                          // Flush the stack and cleanly return to the Start Screen
                           Navigator.pushAndRemoveUntil(
                             context,
                             MaterialPageRoute(
@@ -221,7 +238,7 @@ class _VictoryOverlayState extends State<VictoryOverlay>
                           ),
                         ),
                         child: Text(
-                          "Exit to Menu", // Better wording
+                          "Exit to Menu",
                           style: TextStyle(
                             fontSize: size.width / 22,
                             fontWeight: FontWeight.bold,
@@ -240,58 +257,78 @@ class _VictoryOverlayState extends State<VictoryOverlay>
     );
   }
 
-  /// TOP WINNER
-  Widget _buildWinner(Size size, PlayerColor color) {
+  /// DYNAMIC TOP WINNER TEXT
+  Widget _buildWinner(Size size, PlayerColor color, bool isDefaultWin) {
     String name = widget.allPlayers
-        .firstWhere((p) => p.color == color, orElse: () => widget.allPlayers.first)
+        .firstWhere(
+          (p) => p.color == color,
+          orElse: () => widget.allPlayers.first,
+        )
         .name;
 
     return Column(
       children: [
-        Icon(Icons.emoji_events, size: size.width / 6, color: Colors.amber),
-
+        Icon(
+          isDefaultWin ? Icons.phonelink_erase : Icons.emoji_events,
+          size: size.width / 6,
+          color: isDefaultWin ? Colors.red.shade400 : Colors.amber,
+        ),
         SizedBox(height: size.height / 80),
-
         Text(
-          "$name WINS!",
+          isDefaultWin ? "OPPONENT LEFT" : "$name WINS!",
           style: TextStyle(
             fontSize: size.width / 18,
             fontWeight: FontWeight.bold,
             color: _getColor(color),
           ),
         ),
+        if (isDefaultWin)
+          Text(
+            "$name wins by default",
+            style: TextStyle(
+              fontSize: size.width / 28,
+              color: Colors.grey.shade700,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
       ],
     );
   }
 
-  /// RANK CARD
   /// RANK CARD
   Widget _buildRankCard(
     Size size,
     int rank,
     PlayerColor color, {
     bool isLoser = false,
+    bool isDefaultWin = false,
   }) {
     String rankText;
 
-    switch (rank) {
-      case 1:
-        rankText = "1ST";
-        break;
-      case 2:
-        rankText = "2ND";
-        break;
-      case 3:
-        rankText = "3RD";
-        break;
-      default:
-        rankText = "${rank}TH";
+    if (isLoser) {
+      // If the game ended by default, label the loser as 'QUIT' instead of 'LOSS'
+      rankText = isDefaultWin ? "QUIT" : "LOSS";
+    } else {
+      switch (rank) {
+        case 1:
+          rankText = "1ST";
+          break;
+        case 2:
+          rankText = "2ND";
+          break;
+        case 3:
+          rankText = "3RD";
+          break;
+        default:
+          rankText = "${rank}TH";
+      }
     }
 
-    if (isLoser) rankText = "LOSS";
-
     String name = widget.allPlayers
-        .firstWhere((p) => p.color == color, orElse: () => widget.allPlayers.first)
+        .firstWhere(
+          (p) => p.color == color,
+          orElse: () => widget.allPlayers.first,
+        )
         .name;
 
     return Container(
@@ -315,7 +352,6 @@ class _VictoryOverlayState extends State<VictoryOverlay>
               color: isLoser ? Colors.red : Colors.black,
             ),
           ),
-
           Row(
             children: [
               Container(
@@ -326,11 +362,9 @@ class _VictoryOverlayState extends State<VictoryOverlay>
                   shape: BoxShape.circle,
                 ),
               ),
-
               SizedBox(width: size.width / 30),
-
               Text(
-                name, // Display dynamic name instead of color uppercase
+                name,
                 style: TextStyle(
                   fontSize: size.width / 24,
                   fontWeight: FontWeight.bold,

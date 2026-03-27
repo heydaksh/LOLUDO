@@ -40,7 +40,7 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
 
   void _startGame() {
     int count = selectedPlayers.where((e) => e).length;
-    HapticFeedback.mediumImpact();
+    HapticFeedback.heavyImpact();
     if (count < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -92,7 +92,7 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
       children: [
         GestureDetector(
           onTap: () {
-            HapticFeedback.mediumImpact();
+            HapticFeedback.heavyImpact();
             _togglePlayer(index);
           },
           child: AnimatedContainer(
@@ -215,7 +215,7 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
               /// 🔥 BOT TOGGLE REDESIGN
               suffixIcon: GestureDetector(
                 onTap: () {
-                  HapticFeedback.lightImpact();
+                  HapticFeedback.mediumImpact();
                   setState(() {
                     _isBotList[index] = !_isBotList[index];
                   });
@@ -385,25 +385,27 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
             child: GestureDetector(
               onTap: () {
                 HapticFeedback.mediumImpact();
+
                 showDeveloperDialog(context);
               },
               child: Container(
-                height: size.width / 12,
-                width: size.width / 12,
+                height: size.width / 8,
+                width: size.width / 8,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.black.withValues(alpha: 0.85),
+                  color: Colors.black87,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.4),
+                      color: Colors.black.withValues(alpha: 0.2),
                       blurRadius: 6,
                     ),
                   ],
                 ),
-                child: Icon(
-                  Icons.question_mark,
-                  color: Colors.white,
-                  size: size.width / 18,
+                alignment: .center,
+                child: Text(
+                  'Creator',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white, fontSize: 10),
                 ),
               ),
             ),

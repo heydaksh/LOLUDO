@@ -62,6 +62,12 @@ class LudoScreen extends StatelessWidget {
     final gameSessionId = context.select<GameProvider, int>(
       (p) => p.gameSessionId,
     );
+    final isOnline = context.select<GameProvider, bool>(
+      (p) => p.isOnlineMultiplayer,
+    );
+    final myColor = context.select<GameProvider, PlayerColor?>(
+      (p) => p.myLocalColor,
+    );
 
     return PopScope(
       canPop: false,
@@ -98,6 +104,75 @@ class LudoScreen extends StatelessWidget {
               ),
             ),
 
+            // ─── 3.5 ACTIVE POWERS / CHEATS INDICATOR ───
+            Positioned(
+              bottom: 80, // Placed right above the Settings Menu
+              left: 15,
+              child: Consumer<GameProvider>(
+                builder: (context, provider, child) {
+                  List<String> activeCheats = [];
+                  if (provider.eliminateAllOpponents) {
+                    activeCheats.add("Eliminate All");
+                  }
+                  if (provider.isBulldozerMode) activeCheats.add("Bulldozer");
+                  if (provider.alwaysRollSix) activeCheats.add("Always Roll 6");
+                  if (provider.enableSpecialPowers) {
+                    activeCheats.add("Special Powers");
+                  }
+
+                  if (activeCheats.isEmpty) return const SizedBox.shrink();
+
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.75),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.redAccent.withValues(alpha: 0.5),
+                        width: 1.5,
+                      ),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black45,
+                          blurRadius: 4,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          "ACTIVE RULES:",
+                          style: TextStyle(
+                            color: Colors.amber,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        ...activeCheats.map(
+                          (cheat) => Text(
+                            "• $cheat",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+
             // ─── 4. SETTINGS MENU ───
             Positioned(
               bottom: 10,
@@ -111,6 +186,11 @@ class LudoScreen extends StatelessWidget {
                 child: VictoryOverlay(winners: winner, allPlayers: allPlayers),
               ),
 
+            // ----- Pause Overlay
+            if (context.select<GameProvider, bool>((p) => p.isPaused) &&
+                !isGameOver)
+              const Positioned.fill(child: _PauseOverlay()),
+
             // ─── 6. TELEPORT FLASH ───
             const _TeleportFlashOverlay(),
 
@@ -122,6 +202,11 @@ class LudoScreen extends StatelessWidget {
                 (p) => p.hasReverse && p.state == PawnState.onPath,
               );
               if (!hasReverse) return const SizedBox.shrink();
+
+              // In online mode, only show the button for the local player who owns it
+              if (isOnline && player.color != myColor) {
+                return const SizedBox.shrink();
+              }
 
               // only allow clicking if its their turn.
               final isMyTurn = currentTurn == player.color;
@@ -151,7 +236,7 @@ class LudoScreen extends StatelessWidget {
                           style: TextStyle(
                             color: Colors.black,
                             fontWeight: FontWeight.bold,
-                            fontSize: 12,
+                            fontSize: 10,
                           ),
                         ),
                         icon: Icon(
@@ -159,7 +244,7 @@ class LudoScreen extends StatelessWidget {
                           color: useReverseMode && isMyTurn
                               ? Colors.white
                               : Colors.purple,
-                          size: 18,
+                          size: 14,
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: useReverseMode && isMyTurn
@@ -167,9 +252,10 @@ class LudoScreen extends StatelessWidget {
                               : Colors.white,
                           foregroundColor: Colors.purple,
                           elevation: 6,
+                          minimumSize: const Size(0, 30),
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
+                            horizontal: 8,
+                            vertical: 2,
                           ),
                         ),
                       ),
@@ -219,5 +305,126 @@ class LudoScreen extends StatelessWidget {
       case PlayerColor.red:
         return const Alignment(-1, 0.90); // Below red dice
     }
+  }
+}
+// ==============================
+// PAUSE OVERLAY
+// ==============================
+
+class _PauseOverlay extends StatelessWidget {
+  const _PauseOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<GameProvider>();
+    final size = MediaQuery.of(context).size;
+
+    // Only allow resume if offline, OR if the current player is the host, OR if they are the one who paused it.
+    bool canResume =
+        !provider.isOnlineMultiplayer ||
+        provider.isHost ||
+        provider.myLocalColor?.name == provider.pausedByColor;
+
+    String pauserName = provider.pausedByName ?? "a player";
+
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.8),
+        child: Center(
+          child: Container(
+            width: size.width * 0.8,
+            padding: EdgeInsets.all(size.width / 15),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade900,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white24),
+              boxShadow: const [
+                BoxShadow(color: Colors.black54, blurRadius: 10),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.pause_circle_filled,
+                  color: Colors.orange,
+                  size: size.width / 6,
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Game Paused',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: size.width / 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Paused by $pauserName',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: size.width / 24,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 30),
+                if (canResume)
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 30,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: () {
+                      provider.setPauseState(false);
+                    },
+                    child: Text(
+                      'Resume',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: size.width / 22,
+                      ),
+                    ),
+                  )
+                else
+                  Text(
+                    'Waiting for them to resume...',
+                    style: TextStyle(
+                      color: Colors.orangeAccent,
+                      fontSize: size.width / 26,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                const SizedBox(height: 20),
+                TextButton(
+                  onPressed: () {
+                    provider.exitGame();
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (_) => const StartScreen()),
+                      (route) => false,
+                    );
+                  },
+                  child: Text(
+                    'Quit Game',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontSize: size.width / 26,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

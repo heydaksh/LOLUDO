@@ -71,13 +71,14 @@ extension GameProviderMovement on GameProvider {
         pawn.state = PawnState.onPath;
         pawn.step = 0;
         hasRolled = false;
+
+        AudioManager.playBaseExit();
+        refresh();
+
         syncPawnState(pawn);
         if (isOnlineMultiplayer) {
-          await _db.child('rooms/$currentOnlineRoomId').update({
-            'hasRolled': false,
-          });
+          _db.child('rooms/$currentOnlineRoomId').update({'hasRolled': false});
         }
-        AudioManager.playBaseExit();
         triggerBotTurn(); // Tell the bot to roll again after leaving base
         return;
       }
@@ -143,9 +144,9 @@ extension GameProviderMovement on GameProvider {
             if (intermediateCut) cutOpponent = true;
           }
           if (pawn.step == 56) {
-            Future.delayed(AppConfig.respawnStartDelay, () {
+            _checkWinCondition(pawn.color);
+            Future.delayed(const Duration(milliseconds: 2500), () {
               pawn.isWinningAnimation = false;
-              _checkWinCondition(pawn.color);
               refresh();
             });
           }
@@ -179,7 +180,7 @@ extension GameProviderMovement on GameProvider {
         if (cutOpponent || pawn.state == PawnState.finished) {
           int timeoutCounter = 0;
           while (isPaused ||
-              (AudioManager.isSoundPlaying && timeoutCounter < 100)) {
+              (AudioManager.isSoundPlaying && timeoutCounter < 15)) {
             await Future.delayed(AppConfig.soundCheckInterval);
             if (!isPaused && AudioManager.isSoundPlaying) timeoutCounter++;
           }
@@ -193,7 +194,7 @@ extension GameProviderMovement on GameProvider {
           hasRolled = false;
           // [FIXED]: Firebase must be notified of bonus turn so it doesn't lock your dice!
           if (isOnlineMultiplayer && currentOnlineRoomId != null) {
-            await _db.child('rooms/$currentOnlineRoomId').update({
+            _db.child('rooms/$currentOnlineRoomId').update({
               'hasRolled': false,
             });
           }

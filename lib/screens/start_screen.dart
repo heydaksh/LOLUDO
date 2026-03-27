@@ -1,15 +1,22 @@
-// lib/screens/start_screen.dart
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
-import 'package:ludo_game/models/game_models.dart';
+import 'package:flutter/services.dart';
 import 'package:ludo_game/providers/game_provider.dart';
+import 'package:ludo_game/screens/instructions_screen.dart';
 import 'package:ludo_game/screens/ludo_screen.dart';
 import 'package:ludo_game/screens/multiplayer_join/multiplayer_join_dialog.dart';
 import 'package:ludo_game/screens/player_selection_screen.dart';
 import 'package:provider/provider.dart';
 
-class StartScreen extends StatelessWidget {
+class StartScreen extends StatefulWidget {
   const StartScreen({super.key});
 
+  @override
+  State<StartScreen> createState() => _StartScreenState();
+}
+
+class _StartScreenState extends State<StartScreen> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -17,102 +24,260 @@ class StartScreen extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
+          /// Background
           Positioned.fill(
             child: Image.asset(
               "assets/images/start_game.webp",
               fit: BoxFit.cover,
             ),
           ),
+
+          /// Dark overlay
           Positioned.fill(
-            child: Container(color: Colors.black.withValues(alpha: 0.25)),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.black.withValues(alpha: 0.6),
+                    Colors.black.withValues(alpha: 0.3),
+                    Colors.transparent,
+                  ],
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                ),
+              ),
+            ),
           ),
-          Positioned(
-            bottom: size.height / 12,
-            left: size.width / 15,
-            right: size.width / 15,
+
+          SafeArea(
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                // =========================
-                // OFFLINE / LOCAL PLAY BUTTON
-                // =========================
-                SizedBox(
-                  width: double.infinity,
-                  height: size.height / 16,
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      // 1. Wait for player config to return
-                      final Map<PlayerColor, PlayerSetup>? result =
-                          await Navigator.push(
+                /// 🔥 BUTTONS CENTER
+                Column(
+                  children: [
+                    _glassButton(
+                      context,
+                      text: "PLAY OFFLINE",
+                      icon: Icons.people,
+                      colors: [Colors.blue, Colors.blueAccent],
+                      onTap: () async {
+                        HapticFeedback.heavyImpact();
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const PlayerSelectionScreen(),
+                          ),
+                        );
+
+                        if (result != null && context.mounted) {
+                          context.read<GameProvider>().initializePlayers(
+                            result,
+                          );
+                          Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const PlayerSelectionScreen(),
+                              builder: (_) => const LudoScreen(),
                             ),
                           );
+                        }
+                      },
+                    ),
 
-                      // 2. If valid, initialize game and jump to board
-                      if (result != null && context.mounted) {
-                        context.read<GameProvider>().initializePlayers(result);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const LudoScreen()),
+                    SizedBox(height: size.height / 40),
+
+                    _glassButton(
+                      context,
+                      text: "PLAY ONLINE",
+                      icon: Icons.public,
+                      colors: [Colors.green, Colors.teal],
+                      onTap: () {
+                        HapticFeedback.heavyImpact();
+
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (_) => const MultiplayerJoinDialog(),
                         );
-                      }
-                    },
-                    icon: const Icon(Icons.people, color: Colors.white),
-                    label: const Text(
-                      "PLAY OFFLINE (LOCAL)",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                      },
                     ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blueAccent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                    ),
-                  ),
+                  ],
                 ),
-                SizedBox(height: size.height / 40),
 
-                // =========================
-                // ONLINE MULTIPLAYER BUTTON
-                // =========================
-                SizedBox(
-                  width: double.infinity,
-                  height: size.height / 16,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        barrierDismissible: true,
-                        builder: (context) => const MultiplayerJoinDialog(),
-                      );
-                    },
-                    icon: const Icon(Icons.public, color: Colors.white),
-                    label: const Text(
-                      "PLAY ONLINE (WITH FRIENDS)",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                /// 🔥 BOTTOM ACTIONS
+                Padding(
+                  padding: EdgeInsets.only(
+                    bottom: size.height / 50,
+                    right: size.width / 50,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const InstructionsScreen(),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: EdgeInsets.all(size.width / 40),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.black.withValues(alpha: 0.7),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.4),
+                                blurRadius: 10,
+                              ),
+                            ],
+                          ),
+                          child: const Text(
+                            '?',
+                            style: TextStyle(color: Colors.white, fontSize: 13),
+                          ),
+                        ),
                       ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                    ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 🔥 PREMIUM BUTTON
+  Widget _glassButton(
+    BuildContext context, {
+    required String text,
+    required IconData icon,
+    required List<Color> colors,
+    required VoidCallback onTap,
+  }) {
+    final size = MediaQuery.of(context).size;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(size.width / 12),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            width: size.width * 0.72,
+            height: size.height / 14,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(size.width / 12),
+
+              /// 🔥 BASE GLASS LAYER
+              gradient: LinearGradient(
+                colors: [
+                  Colors.white.withValues(alpha: 0.15),
+                  Colors.white.withValues(alpha: 0.04),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+
+              /// 🔥 GLASS BORDER
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.25),
+                width: size.width / 300,
+              ),
+
+              /// 🔥 OUTER GLOW (COLOR)
+              boxShadow: [
+                BoxShadow(
+                  color: colors.first.withValues(alpha: 0.35),
+                  blurRadius: 25,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+
+            child: Stack(
+              children: [
+                /// 🔥 COLOR INFUSION LAYER (main visual)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(size.width / 12),
+                      gradient: LinearGradient(
+                        colors: [
+                          colors.first.withValues(alpha: 0.35),
+                          colors.last.withValues(alpha: 0.15),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                  ),
+                ),
+
+                /// 🔥 LIGHT HIGHLIGHT (top shine)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: size.height / 70,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(size.width / 12),
+                      ),
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.white.withValues(alpha: 0.4),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                /// 🔥 INNER SHADOW (depth)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(size.width / 12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.2),
+                          blurRadius: 10,
+                          offset: Offset(0, size.height / 200),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                /// 🔥 CONTENT
+                Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(icon, color: Colors.white, size: size.width / 18),
+                      SizedBox(width: size.width / 30),
+                      Text(
+                        text,
+                        style: TextStyle(
+                          fontSize: size.width / 22,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

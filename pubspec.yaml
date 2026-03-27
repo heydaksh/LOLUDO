@@ -74,6 +74,8 @@ flutter:
     - assets/player_selection/
     - assets/triangle_reach/
     - assets/winning/
+    - assets/teleport/
+
     - shorebird.yaml
 
   # An image asset can refer to one or more resolution-specific "variants", see

@@ -63,6 +63,8 @@ class Player {
   String name;
   bool isBot;
 
+  int turnsWithoutSix;
+
   Player({
     required this.color,
     required this.pawns,
@@ -70,6 +72,7 @@ class Player {
     this.hasMultiplier = false,
     this.name = '',
     this.isBot = false,
+    this.turnsWithoutSix = 0,
   });
 
   /// True when all pawns reached final state

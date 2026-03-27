@@ -14,26 +14,39 @@ extension GameProviderDice on GameProvider {
     try {
       isDiceRolling = true;
 
-      // [FIX]: Firebase ko batane se PEHLE number generate karein
+      //  Firebase ko batane se PEHLE number generate karein
       final rand = Random();
+      Player activePlayer = players.firstWhere((p) => p.color == currentTurn);
 
       if (alwaysRollSix) {
         diceResult = 6;
       } else {
-        // [FIX]: Normal 1 se 6 probability (Pehle 0.25 par 6 tha, jo unfair tha)
-        diceResult = rand.nextInt(6) + 1;
+        if (activePlayer.turnsWithoutSix >= 7) {
+          diceResult = 6;
+          debugPrint(
+            "Badluck protection triggered for ${activePlayer.color.name}!.",
+          );
+        } else {
+          diceResult = rand.nextInt(6) + 1;
+        }
       }
-      debugPrint("Dice rolled: $diceResult");
+      if (diceResult == 6) {
+        activePlayer.turnsWithoutSix = 0;
+      } else {
+        activePlayer.turnsWithoutSix++;
+      }
+      debugPrint(
+        "Dice rolled: $diceResult (Dry spell: ${activePlayer.turnsWithoutSix})",
+      );
 
       // --- APPLY DICE MULTIPLIER ---
-      Player activePlayer = players.firstWhere((p) => p.color == currentTurn);
       if (activePlayer.hasMultiplier) {
         diceResult *= 2;
         activePlayer.hasMultiplier = false;
         debugPrint("🎲 Dice Multiplier applied! New roll: $diceResult");
       }
 
-      // [FIX]: AB Firebase ko sync karein, taaki naya number network par chala jaye
+      //  AB Firebase ko sync karein, taaki naya number network par chala jaye
       syncDiceRolling(true);
 
       refresh();
@@ -69,7 +82,7 @@ extension GameProviderDice on GameProvider {
       refresh();
 
       await Future.delayed(AppConfig.autoPassTurnDelay);
-      if (isGameOver || !players.any((p) => p.color == currentTurn)) {
+      if (isGameOver || !isPlayerInGame(currentTurn)) {
         debugPrint('[ROLL ABORTED] Game state changed during dice roll.');
         return;
       }
@@ -86,7 +99,7 @@ extension GameProviderDice on GameProvider {
         await Future.delayed(AppConfig.soundCheckInterval);
       }
 
-      if (isGameOver || !players.any((p) => p.color == currentTurn)) return;
+      if (isGameOver || !isPlayerInGame(currentTurn)) return;
 
       movePawn(validPawns.first);
     } else {
@@ -101,7 +114,7 @@ extension GameProviderDice on GameProvider {
           await Future.delayed(AppConfig.soundCheckInterval);
         }
 
-        if (isGameOver || !players.any((p) => p.color == currentTurn)) return;
+        if (isGameOver || !isPlayerInGame(currentTurn)) return;
 
         Pawn bestPawn = _chooseBestPawnForBot(validPawns);
         movePawn(bestPawn);
@@ -168,7 +181,7 @@ extension GameProviderDice on GameProvider {
           bool canCut = false;
           if (!BoardCoordinates.safeZones.contains(nextAbs)) {
             for (var player in players) {
-              if (player.color != pawn.color) {
+              if (player.color != pawn.color && isPlayerInGame(player.color)) {
                 for (var oppPawn in player.pawns) {
                   if (oppPawn.state == PawnState.onPath &&
                       !oppPawn.isShielded) {
@@ -186,7 +199,7 @@ extension GameProviderDice on GameProvider {
           bool isVulnerable = false;
           if (!BoardCoordinates.safeZones.contains(currentAbs)) {
             for (var player in players) {
-              if (player.color != pawn.color) {
+              if (player.color != pawn.color && isPlayerInGame(player.color)) {
                 for (var oppPawn in player.pawns) {
                   if (oppPawn.state == PawnState.onPath) {
                     int oppAbs = BoardCoordinates.getAbsolutePosition(oppPawn);

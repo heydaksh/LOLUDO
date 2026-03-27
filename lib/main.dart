@@ -13,6 +13,10 @@ import 'package:provider/provider.dart';
 // Initializes audio and launches the Flutter app.
 // ==============================
 
+// global key for scaffold messanger.
+final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
+
 void main() async {
   // Ensures Flutter engine is fully initialized before calling async platform APIs.
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,6 +47,7 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'Flutter Ludo',
+        key: scaffoldMessengerKey,
         theme: ThemeData(
           colorScheme: ColorScheme.dark(primary: Colors.red),
           useMaterial3: true,

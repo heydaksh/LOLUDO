@@ -2,6 +2,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:ludo_game/providers/game_provider.dart';
 import 'package:ludo_game/screens/ludo_screen.dart';
 import 'package:provider/provider.dart';
@@ -114,7 +115,7 @@ class _MultiplayerJoinDialogState extends State<MultiplayerJoinDialog>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _title(size),
+                      _title(size, context, provider),
                       SizedBox(height: size.height / 40),
 
                       if (provider.currentOnlineRoomId == null)
@@ -143,16 +144,36 @@ class _MultiplayerJoinDialogState extends State<MultiplayerJoinDialog>
   }
 
   // ================= UI PARTS =================
+  Widget _title(Size size, BuildContext context, GameProvider provider) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          "Play Online",
+          style: TextStyle(
+            fontSize: size.width / 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            letterSpacing: 1.2,
+          ),
+        ),
 
-  Widget _title(Size size) {
-    return Text(
-      "Play Online",
-      style: TextStyle(
-        fontSize: size.width / 18,
-        fontWeight: FontWeight.bold,
-        color: Colors.white,
-        letterSpacing: 1.2,
-      ),
+        // [FIXED]: Close Button to Disband Room
+        GestureDetector(
+          onTap: () {
+            // Clean up the room data before closing the dialog
+            if (provider.currentOnlineRoomId != null) {
+              provider.exitGame();
+            }
+            Navigator.pop(context);
+          },
+          child: Icon(
+            Icons.cancel,
+            color: Colors.white70,
+            size: size.width / 14,
+          ),
+        ),
+      ],
     );
   }
 
@@ -169,6 +190,9 @@ class _MultiplayerJoinDialogState extends State<MultiplayerJoinDialog>
         color: Colors.white.withValues(alpha: 0.05),
       ),
       child: TextField(
+        keyboardType: hint == 'Your Name'
+            ? TextInputType.text
+            : TextInputType.number,
         controller: controller,
         style: const TextStyle(color: Colors.white),
         decoration: InputDecoration(
@@ -398,7 +422,19 @@ class _MultiplayerJoinDialogState extends State<MultiplayerJoinDialog>
           onTap: isCreating
               ? null
               : () async {
-                  if (_nameController.text.trim().isEmpty) return;
+                  if (_nameController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        behavior: SnackBarBehavior.floating,
+                        content: Text(
+                          'Please enter your name !',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
                   setState(() => isCreating = true);
                   try {
                     await provider.createOnlineRoom(
@@ -442,10 +478,21 @@ class _MultiplayerJoinDialogState extends State<MultiplayerJoinDialog>
               : () async {
                   if (_nameController.text.trim().isEmpty ||
                       _roomCodeController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        behavior: SnackBarBehavior.floating,
+                        content: Text(
+                          'Please enter name and room code',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
                     return;
                   }
                   setState(() => isJoining = true);
                   try {
+                    HapticFeedback.mediumImpact();
                     await provider.joinOnlineRoom(
                       _roomCodeController.text.trim(),
                       _nameController.text.trim(),

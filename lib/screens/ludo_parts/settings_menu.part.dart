@@ -30,7 +30,7 @@ class _SettingsMenu extends StatelessWidget {
                 onTap: () {
                   HapticFeedback.mediumImpact();
 
-                  gameProvider.togglePause(context);
+                  gameProvider.setPauseState(!gameProvider.isPaused);
                 },
                 child: Container(
                   margin: EdgeInsets.only(right: size.width / 40),
@@ -100,6 +100,7 @@ class _SettingsMenu extends StatelessWidget {
                           ],
                         ),
                       ),
+
                       /// RESET
                       PopupMenuItem(
                         value: 'Reset',
@@ -166,6 +167,7 @@ class _SettingsMenu extends StatelessWidget {
                           ],
                         ),
                       ),
+
                       /// EXIT
                       PopupMenuItem(
                         value: 'Exit',
@@ -284,6 +286,7 @@ class _SettingsMenu extends StatelessWidget {
                                       color: Colors.red,
                                     ),
                                     SizedBox(height: size.height / 80),
+
                                     /// TITLE
                                     Text(
                                       "Exit Game",
@@ -293,6 +296,7 @@ class _SettingsMenu extends StatelessWidget {
                                       ),
                                     ),
                                     SizedBox(height: size.height / 100),
+
                                     /// MESSAGE
                                     Text(
                                       "Are you sure you want to exit the game?",
@@ -303,6 +307,7 @@ class _SettingsMenu extends StatelessWidget {
                                       ),
                                     ),
                                     SizedBox(height: size.height / 40),
+
                                     /// BUTTONS
                                     Row(
                                       mainAxisAlignment:
@@ -321,8 +326,8 @@ class _SettingsMenu extends StatelessWidget {
                                             shape: RoundedRectangleBorder(
                                               borderRadius:
                                                   BorderRadius.circular(
-                                                size.width / 10,
-                                              ),
+                                                    size.width / 10,
+                                                  ),
                                             ),
                                           ),
                                           child: Text(
@@ -333,6 +338,7 @@ class _SettingsMenu extends StatelessWidget {
                                             ),
                                           ),
                                         ),
+
                                         /// EXIT
                                         ElevatedButton(
                                           onPressed: () async {
@@ -362,8 +368,8 @@ class _SettingsMenu extends StatelessWidget {
                                             shape: RoundedRectangleBorder(
                                               borderRadius:
                                                   BorderRadius.circular(
-                                                size.width / 10,
-                                              ),
+                                                    size.width / 10,
+                                                  ),
                                             ),
                                           ),
                                           child: Text(
@@ -510,7 +516,9 @@ class _SettingsMenu extends StatelessWidget {
       builder: (_) {
         return Consumer<GameProvider>(
           builder: (context, provider, child) {
-            final players = provider.players;
+            final players = provider.players
+                .where((p) => provider.isPlayerInGame(p.color))
+                .toList();
 
             return Dialog(
               shape: RoundedRectangleBorder(

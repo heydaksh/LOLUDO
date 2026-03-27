@@ -81,24 +81,32 @@ extension GameProviderPlayer on GameProvider {
       debugPrint(
         '🚫 [PLAYER REMOVED] ${color.name} added to removedPlayers list.',
       );
+      Player removedPlayer = players.firstWhere((p) => p.color == color);
+      for (var pawn in removedPlayer.pawns) {
+        pawn.reset();
+      }
     }
 
-    players.removeWhere((p) => p.color == color);
+    int activeCount = players.where((p) => isPlayerInGame(p.color)).length;
 
-    if (players.length == 1) {
-      PlayerColor remainingPlayer = players.first.color;
+    if (activeCount == 1) {
+      PlayerColor remainingPlayer = players
+          .firstWhere((p) => isPlayerInGame(p.color))
+          .color;
 
       if (!winner.contains(remainingPlayer)) {
         winner.add(remainingPlayer);
       }
 
       isGameOver = true;
+      isPaused = false;
       debugPrint(
         '[GAME OVER] ALL OPPONENTS REMOVED. ${remainingPlayer.name.toUpperCase()} WINS!',
       );
       AudioManager.playGameWin();
     } else if (winner.length >= players.length - 1) {
       isGameOver = true;
+      isPaused = false;
     }
 
     refresh();
@@ -126,9 +134,13 @@ extension GameProviderPlayer on GameProvider {
     if (isOnlineMultiplayer &&
         currentOnlineRoomId != null &&
         myLocalColor != null) {
-      _db
-          .child('rooms/$currentOnlineRoomId/players/${myLocalColor!.name}')
-          .update({'isOnline': false});
+      if (isHost && roomStatus == 'waiting') {
+        _db.child('rooms/$currentOnlineRoomId').remove();
+      } else {
+        _db
+            .child('rooms/$currentOnlineRoomId/players/${myLocalColor!.name}')
+            .update({'isOnline': false});
+      }
     }
 
     isOnlineMultiplayer = false;

@@ -87,10 +87,7 @@ class AudioManager {
   static const List<String> passTurnSound = ['misc_sounds/pass_turn.wav'];
 
   /// Sound played when a pawn is teleported through a portal.
-  static const List<String> portalTeleportSound = [
-    'entry/spiderman.wav',
-    'entry/yooooooooooooooooooo.wav',
-  ];
+  static const List<String> portalTeleportSound = ['teleport/yayyyy.wav'];
 
   /// Sound played when a pawn reaches the center winning triangle.
   static const List<String> triangleReachSound = [
@@ -191,5 +188,15 @@ class AudioManager {
 
     await _safeZonePlayer.stop();
     await _safeZonePlayer.play(AssetSource(selectedSound));
+  }
+
+  // ==============================
+  // STOP AUDIO
+  // ==============================
+
+  /// Stops all currently playing sounds immediately.
+  static Future<void> stopAllSounds() async {
+    await _effectPlayer.stop();
+    await _safeZonePlayer.stop();
   }
 }

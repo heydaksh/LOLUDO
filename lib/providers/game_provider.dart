@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:ludo_game/main.dart';
 import 'package:ludo_game/models/game_models.dart';
 import 'package:ludo_game/models/portals.dart';
 import 'package:ludo_game/models/powers.dart';
@@ -81,58 +82,25 @@ class GameProvider extends ChangeNotifier {
 
   /// Tracks if the game is manually paused by the user.
   bool isPaused = false;
+  String? pausedByColor;
+  String? pausedByName;
 
-  void togglePause(BuildContext context) async {
-    // 1. Immediately pause the game logic underneath
-    isPaused = true;
-    refresh();
-
-    // 2. Show the dialog
-    await showDialog(
-      context: context,
-      barrierDismissible: false, // Prevent tapping outside to dismiss instantly
-      builder: (_) {
-        return AlertDialog(
-          backgroundColor: Colors.grey.shade900,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          content: const Text(
-            'Game is paused...',
-            style: TextStyle(color: Colors.white, fontSize: 18),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context); // Close dialog
-              },
-              child: const Text(
-                'Resume',
-                style: TextStyle(color: Colors.green),
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context); // Close dialog
-                exitGame();
-                // Return to StartScreen (assumed to be the first route)
-                Navigator.popUntil(context, (route) => route.isFirst);
-              },
-              child: const Text(
-                'Quit Game',
-                style: TextStyle(color: Colors.red),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-
-    // 3. Cleanly unpause the logic regardless of how the dialog closed (Button or System Back)
-    isPaused = false;
-    refresh();
+  Future<void> setPauseState(bool pause) async {
+    if (isOnlineMultiplayer && currentOnlineRoomId != null) {
+      // Sync the pause state to Firebase
+      await _db.child('rooms/$currentOnlineRoomId/pauseState').update({
+        'isPaused': pause,
+        'pausedByColor': pause ? myLocalColor?.name : null,
+        'pausedByName': pause ? myPlayerName : null,
+      });
+    } else {
+      // Offline local mode
+      isPaused = pause;
+      pausedByColor = pause ? 'local' : null;
+      pausedByName = pause ? 'Local Player' : null;
+      refresh();
+    }
   }
-
   // ─── Portal State ───
 
   /// List of currently active portal pairs on the main board path.
@@ -410,6 +378,18 @@ class GameProvider extends ChangeNotifier {
             'pawns': initialPawnState,
 
             'boardState': {'protals': [], 'powers': []},
+            'cheats': {
+              'eliminateAll': false,
+              'bulldozer': false,
+              'alwaysSix': false,
+
+              'specialPowers': true,
+            },
+            'pauseState': {
+              'isPaused': false,
+              'pausedByColor': null,
+              'pausedByName': null,
+            },
           })
           .timeout(const Duration(seconds: 10));
 
@@ -606,22 +586,89 @@ class GameProvider extends ChangeNotifier {
             var pData = pawnsData[pawnId];
 
             if (pData != null) {
-              pawn.step = pData['step'];
-              pawn.state = PawnState.values.firstWhere(
+              int newStep = pData['step'];
+              PawnState newState = PawnState.values.firstWhere(
                 (e) => e.name == pData['state'],
               );
+
+              // --- REMOTE SOUND & ANIMATION TRIGGERS ---
+              // These only trigger if the state actually changed, meaning this
+              // local client didn't make the move (otherwise state would already match).
+
+              // 1. Triangle Reach (Finished)
+              if (pawn.state != PawnState.finished &&
+                  newState == PawnState.finished) {
+                pawn.isWinningAnimation = true;
+                AudioManager.playTriangleReach();
+
+                // Extend to 2.5 seconds to match local animation timing
+                Future.delayed(const Duration(milliseconds: 2500), () {
+                  pawn.isWinningAnimation = false;
+                  refresh();
+                });
+              }
+              // 2. Kill / Knockout (Moved back to Base)
+              else if (pawn.state != PawnState.inBase &&
+                  newState == PawnState.inBase) {
+                pawn.isDeadAnimation = true;
+                AudioManager.playKnockOut();
+
+                Future.delayed(const Duration(milliseconds: 600), () {
+                  pawn.isDeadAnimation = false;
+                  refresh();
+                });
+              }
+              // 3. Base Exit (Moved out of Base)
+              else if (pawn.state == PawnState.inBase &&
+                  newState == PawnState.onPath) {
+                AudioManager.playBaseExit();
+              }
+              // 4. Movement / Teleport
+              else if ((pawn.state == PawnState.onPath ||
+                      pawn.state == PawnState.onHomeStretch) &&
+                  (newState == PawnState.onPath ||
+                      newState == PawnState.onHomeStretch)) {
+                int stepDiff = (newStep - pawn.step).abs();
+
+                if (stepDiff > 12) {
+                  // A large jump implies a teleport portal or swap power was used
+                  AudioManager.playPortalTeleport();
+                } else if (stepDiff > 0) {
+                  // Normal single-step movement
+                  AudioManager.playPawnMovement();
+                }
+              }
+
+              // Apply the new state and parameters
+              pawn.step = newStep;
+              pawn.state = newState;
               pawn.shieldTurn = pData['shieldTurn'] ?? 0;
               pawn.hasReverse = pData['hasReverse'] ?? false;
+
+              // 5. Game Win Detection
+              // Check win condition after applying state so the victory sound plays for everyone
+              if (newState == PawnState.finished) {
+                _checkWinCondition(pawn.color);
+              }
             }
           }
         }
       }
 
       // ==========================================
-      //  SYNC ROOM STATUS & KICKED PLAYERS
+      //  4.2 SYNC ROOM STATUS & KICKED PLAYERS
       // ==========================================
       if (roomData['status'] != null) {
-        roomStatus = roomData['status'];
+        String newStatus = roomData['status'];
+
+        //  When the game starts, silently delete all non-joined players
+        // from the local list so the Turn Logic and Victory Logic calculate correctly!
+        if (roomStatus == 'waiting' && newStatus == 'playing') {
+          Map pMap = roomData['players'] ?? {};
+          players.removeWhere((p) => !pMap.containsKey(p.color.name));
+        }
+
+        roomStatus = newStatus;
       }
 
       // ==========================================
@@ -642,12 +689,79 @@ class GameProvider extends ChangeNotifier {
             if (!isPlayerOnline && !removedPlayers.contains(p.color)) {
               removePlayer(p.color);
             }
+          } else {
+            // If they are missing from Firebase while the game is playing,
+            // it means the host kicked them mid-game. We must remove them!
+            if (roomStatus == 'playing' && !removedPlayers.contains(p.color)) {
+              removePlayer(p.color);
+            }
           }
         }
       } else {
         onlinePlayersMap = {};
       }
 
+      // ==========================================
+      // 6. SYNC CHEATS & SNACKBAR NOTIFICATIONS
+      // ==========================================
+      if (roomData['cheats'] != null) {
+        Map cheatsMap = roomData['cheats'];
+
+        void checkAndNotify(String name, bool oldVal, bool newVal) {
+          if (oldVal != newVal && !isHost) {
+            String msg = newVal
+                ? "$name was ENABLED by Host!"
+                : "$name was DISABLED by Host!";
+            scaffoldMessengerKey.currentState?.showSnackBar(
+              SnackBar(
+                content: Text(
+                  msg,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                backgroundColor: newVal
+                    ? Colors.green.shade700
+                    : Colors.red.shade700,
+                duration: const Duration(seconds: 3),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        }
+
+        bool newEliminate = cheatsMap['eliminateAll'] ?? false;
+        checkAndNotify("Eliminate All", eliminateAllOpponents, newEliminate);
+        eliminateAllOpponents = newEliminate;
+
+        bool newBulldozer = cheatsMap['bulldozer'] ?? false;
+        checkAndNotify("Bulldozer Mode", isBulldozerMode, newBulldozer);
+        isBulldozerMode = newBulldozer;
+
+        bool newAlwaysSix = cheatsMap['alwaysSix'] ?? false;
+        checkAndNotify("Always Roll 6", alwaysRollSix, newAlwaysSix);
+        alwaysRollSix = newAlwaysSix;
+
+        bool newSpecial = cheatsMap['specialPowers'] ?? true;
+        checkAndNotify("Special Powers", enableSpecialPowers, newSpecial);
+        enableSpecialPowers = newSpecial;
+      }
+      // ==========================================
+      // 7. SYNC PAUSE STATE
+      // ==========================================
+      if (roomData['pauseState'] != null) {
+        bool incomingPause = roomData['pauseState']['isPaused'] ?? false;
+        if (isPaused != incomingPause) {
+          isPaused = incomingPause;
+          pausedByColor = roomData['pauseState']['pausedByColor'];
+          pausedByName = roomData['pauseState']['pausedByName'];
+        }
+      } else {
+        isPaused = false;
+        pausedByColor = null;
+        pausedByName = null;
+      }
       // Update the UI with the fresh data
       refresh();
     });
@@ -704,6 +818,7 @@ class GameProvider extends ChangeNotifier {
 
     await _db.child('rooms/$currentOnlineRoomId').update({
       'isDiceRolling': rolling,
+      'diceResult': diceResult, // Add this line!
     });
   }
 
@@ -742,11 +857,13 @@ class GameProvider extends ChangeNotifier {
   /// Centrally determine if a color is part of the current game session.
   bool isPlayerInGame(PlayerColor color) {
     if (isOnlineMultiplayer) {
-      // In online mode, check if the color is in the players map
-      return onlinePlayersMap.containsKey(color.name);
+      // In online mode, check if the color is in the players map AND not removed
+      return onlinePlayersMap.containsKey(color.name) &&
+          !removedPlayers.contains(color);
     } else {
       // In offline mode, the 'players' list only contains selected players
-      return players.any((p) => p.color == color);
+      return players.any((p) => p.color == color) &&
+          !removedPlayers.contains(color);
     }
   }
 

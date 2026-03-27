@@ -7,7 +7,7 @@ extension GameProviderCapture on GameProvider {
 
     if (!BoardCoordinates.safeZones.contains(myAbsolutePosition)) {
       for (var player in players) {
-        if (player.color != pawn.color) {
+        if (player.color != pawn.color && isPlayerInGame(player.color)) {
           for (var oppPawn in player.pawns) {
             if (oppPawn.state == PawnState.onPath) {
               int oppAbsolutePosition = BoardCoordinates.getAbsolutePosition(
