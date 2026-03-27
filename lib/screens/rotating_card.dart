@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:ludo_game/utils/app_config.dart';
 
 class RotatingCredit extends StatefulWidget {
   const RotatingCredit({super.key});
@@ -24,7 +25,7 @@ class _RotatingCreditState extends State<RotatingCredit> {
   void initState() {
     super.initState();
 
-    _timer = Timer.periodic(const Duration(seconds: 2), (_) {
+    _timer = Timer.periodic(AppConfig.rotatingCardInterval, (_) {
       if (!mounted) return;
 
       setState(() {
@@ -44,7 +45,7 @@ class _RotatingCreditState extends State<RotatingCredit> {
     final size = MediaQuery.of(context).size;
 
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 400),
+      duration: AppConfig.rotatingCardAnimationDuration,
       transitionBuilder: (child, animation) {
         return FadeTransition(
           opacity: animation,

@@ -8,6 +8,13 @@ extension GameProviderPlayer on GameProvider {
     gameSessionId++;
     removedPlayers.clear();
 
+    // Ensure online mode is completely disabled for local play
+    isOnlineMultiplayer = false;
+    currentOnlineRoomId = null;
+    isHost = false;
+    myLocalColor = null;
+    _roomSubscription?.cancel();
+
     _startingConfig = Map.from(selectedPlayersInfo);
     players.clear();
 
@@ -23,7 +30,7 @@ extension GameProviderPlayer on GameProvider {
     }).toList();
 
     currentTurn = players.first.color;
-    debugPrint("Active players: ${players.map((e) => e.name).toList()}");
+    isPaused = false;
     refresh();
   }
 
@@ -33,6 +40,7 @@ extension GameProviderPlayer on GameProvider {
 
     winner.clear();
     isGameOver = false;
+    isPaused = false;
     removedPlayers.clear();
     diceResult = 1;
     hasRolled = false;
@@ -108,5 +116,33 @@ extension GameProviderPlayer on GameProvider {
       isGameOver = true;
       debugPrint('[GAME OVER] ALL PLAYERS HAVE WON THE GAME!');
     }
+  }
+
+  void exitGame() {
+    debugPrint('🚪 Exiting game...');
+    isGameOver = false;
+
+    // Disconnect from Firebase if exiting an online game
+    if (isOnlineMultiplayer &&
+        currentOnlineRoomId != null &&
+        myLocalColor != null) {
+      _db
+          .child('rooms/$currentOnlineRoomId/players/${myLocalColor!.name}')
+          .update({'isOnline': false});
+    }
+
+    isOnlineMultiplayer = false;
+    currentOnlineRoomId = null;
+    isHost = false;
+    myLocalColor = null;
+    _roomSubscription?.cancel();
+
+    _startingConfig.clear();
+    players.clear();
+    winner.clear();
+    removedPlayers.clear();
+    activePortals.clear();
+    activePower.clear();
+    refresh();
   }
 }

@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lottie/lottie.dart';
 import 'package:ludo_game/models/game_models.dart';
-import 'package:ludo_game/screens/player_selection_screen.dart';
+import 'package:ludo_game/models/portals.dart';
+import 'package:ludo_game/models/powers.dart';
+import 'package:ludo_game/screens/start_screen.dart';
+import 'package:ludo_game/utils/app_config.dart';
 import 'package:ludo_game/utils/audio_manager.dart';
 import 'package:ludo_game/utils/board_coordinates.dart';
 import 'package:ludo_game/widgets/board_painter.dart';
@@ -84,7 +87,7 @@ class LudoScreen extends StatelessWidget {
             SafeArea(
               child: AnimatedAlign(
                 // ADJUSTABLE: Change dice slide animation speed here (currently 450 ms).
-                duration: const Duration(milliseconds: 300),
+                duration: AppConfig.standardUiAnimationDuration,
                 curve: Curves.easeInOutCubic,
                 alignment: _getDiceAlignment(currentTurn),
                 child: const Padding(
@@ -128,12 +131,12 @@ class LudoScreen extends StatelessWidget {
               return SafeArea(
                 child: AnimatedAlign(
                   alignment: _getPowerAlignment(player.color),
-                  duration: const Duration(milliseconds: 300),
+                  duration: AppConfig.standardUiAnimationDuration,
                   child: Padding(
                     padding: const EdgeInsets.all(10.0),
                     child: AnimatedOpacity(
+                      duration: AppConfig.standardUiAnimationDuration,
                       opacity: isMyTurn ? 1.0 : 0.5,
-                      duration: const Duration(milliseconds: 300),
                       child: ElevatedButton.icon(
                         onPressed: isMyTurn
                             ? () {
@@ -187,7 +190,6 @@ class LudoScreen extends StatelessWidget {
 
   /// Maps the current player's turn to a screen-corner Alignment
   /// so the dice floats near their base corner.
-  ///
   /// ADJUSTABLE: Change the dice corner position for each color here.
   ///   Green  → top-left     (-1, -0.85)
   ///   Yellow → top-right    ( 1, -0.85)

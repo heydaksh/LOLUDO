@@ -19,15 +19,25 @@ class _BoardLayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final gameProvider = context.watch<GameProvider>();
-    // ignore: unused_local_variable
-    final boardSize = MediaQuery.of(context).size;
-
-    //  Fetch the list of removed players
+    // Optimization: Only listen to state that affects the board layout/content.
+    final players = context.select<GameProvider, List<Player>>((p) => p.players);
+    final currentTurn = context.select<GameProvider, PlayerColor>(
+      (p) => p.currentTurn,
+    );
+    final activePortals = context.select<GameProvider, List<Portals>>(
+      (p) => p.activePortals,
+    );
+    final activePower = context.select<GameProvider, List<Power>>(
+      (p) => p.activePower,
+    );
+    final winner = context.select<GameProvider, List<PlayerColor>>(
+      (p) => p.winner,
+    );
     final removedPlayers = context.select<GameProvider, List<PlayerColor>>(
       (p) => p.removedPlayers,
     );
-    debugPrint("BoardLayer rebuild");
+
+    final gameProvider = context.read<GameProvider>();
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -47,10 +57,13 @@ class _BoardLayer extends StatelessWidget {
                 );
 
                 // ─── Flatten all player pawns into one list ───
-                final List<Pawn> allPawn = gameProvider.players
-                    .expand((p) => p.pawns)
-                    .toList();
 
+                final List<Pawn> allPawn = [];
+                for (var player in players) {
+                  if (gameProvider.isPlayerInGame(player.color)) {
+                    allPawn.addAll(player.pawns);
+                  }
+                }
                 // ─── Detect any active winning animation ───
                 final bool isAnyPawnWinning = allPawn.any(
                   (p) => p.isWinningAnimation,
@@ -88,21 +101,19 @@ class _BoardLayer extends StatelessWidget {
                           child: CustomPaint(
                             size: boardSize,
                             painter: LudoBoardPainter(
-                              portals: gameProvider.activePortals,
-                              portalState: gameProvider.activePortals
+                              portals: activePortals,
+                              portalState: activePortals
                                   .map(
                                     (p) => '${p.a}-${p.b}-${p.remainingTurns}',
                                   )
                                   .join('|'),
-                              // portalState: gameProvider.activePortals
-                              //     .map((p) => '${p.a}-${p.b}-${p.remainingTurns}')
-                              //     .join('|'),
                             ),
                           ),
                         ),
 
                         // ─── 1.5 PORTAL WIDGETS (ANIMATED) ───
-                        ...gameProvider.activePortals.expand((portal) {
+                         // ─── 1.5 PORTAL WIDGETS (ANIMATED) ───
+                        ...activePortals.expand((portal) {
                           final Offset posA =
                               BoardCoordinates.mainPath[portal.a % 52];
                           final Offset posB =
@@ -131,7 +142,7 @@ class _BoardLayer extends StatelessWidget {
                         }),
 
                         // ─── 1.6 POWER WIDGETS (ANIMATED) ───
-                        ...gameProvider.activePower.map((power) {
+                        ...activePower.map((power) {
                           final Offset pos =
                               BoardCoordinates.mainPath[power.position % 52];
                           final double cellSize = boardSize.width / 15;
@@ -143,7 +154,7 @@ class _BoardLayer extends StatelessWidget {
                           );
                         }),
 
-                        ...gameProvider.winner.asMap().entries.map((entry) {
+                        ...winner.asMap().entries.map((entry) {
                           final int rank = entry.key + 1;
                           final PlayerColor color = entry.value;
 
@@ -157,30 +168,18 @@ class _BoardLayer extends StatelessWidget {
                             case PlayerColor.green:
                               left = boardSize.width * (0.5 / 15);
                               top = boardSize.width * (0.5 / 15);
-                              debugPrint(
-                                'Positioning Green Crown responsively at $left, $top',
-                              );
                               break;
                             case PlayerColor.yellow:
                               left = boardSize.width * (9.5 / 15);
                               top = boardSize.width * (0.5 / 15);
-                              debugPrint(
-                                'Positioning Yellow Crown responsively at $left, $top',
-                              );
                               break;
                             case PlayerColor.blue:
                               left = boardSize.width * (9.5 / 15);
                               top = boardSize.width * (9.5 / 15);
-                              debugPrint(
-                                'Positioning Blue Crown responsively at $left, $top',
-                              );
                               break;
                             case PlayerColor.red:
                               left = boardSize.width * (0.5 / 15);
                               top = boardSize.width * (9.5 / 15);
-                              debugPrint(
-                                'Positioning Red Crown responsively at $left, $top',
-                              );
                               break;
                           }
 
@@ -204,10 +203,11 @@ class _BoardLayer extends StatelessWidget {
                             height: baseSize,
                             child: IgnorePointer(
                               child: TweenAnimationBuilder<double>(
-                                curve: Curves.elasticOut,
+                                curve: Curves.easeInOut,
                                 key: ValueKey('Crown${color.name}'),
                                 tween: Tween(begin: 0.0, end: 1.0),
-                                duration: const Duration(milliseconds: 800),
+                                duration:
+                                    AppConfig.boardLayerTransitionDuration,
                                 builder: (context, scale, child) {
                                   return Transform.scale(
                                     scale: scale,
@@ -262,52 +262,48 @@ class _BoardLayer extends StatelessWidget {
                         // Map each pawn to its PawnWidget, then sort so that
                         // the current player's pawns always render on top (z-order).
                         ...allPawn.map((pawn) {
-                            final Offset pos =
-                                BoardCoordinates.getPhysicalLocation(
-                                  boardSize,
-                                  pawn,
-                                );
+                          final Offset pos =
+                              BoardCoordinates.getPhysicalLocation(
+                            boardSize,
+                            pawn,
+                          );
 
-                            final int cellX = (pos.dx / (boardSize.width / 15))
-                                .round();
-                            final int cellY = (pos.dy / (boardSize.height / 15))
-                                .round();
+                          final int cellX = (pos.dx / (boardSize.width / 15))
+                              .round();
+                          final int cellY = (pos.dy / (boardSize.height / 15))
+                              .round();
 
-                            final String key = "$cellX-$cellY";
+                          final String key = "$cellX-$cellY";
 
-                            final List<Pawn> overlapping =
-                                positionMap[key] ?? [pawn];
-                            final int overlapIndex = overlapping.indexOf(pawn);
-                            final int totalOverlapping = overlapping.length;
+                          final List<Pawn> overlapping =
+                              positionMap[key] ?? [pawn];
+                          final int overlapIndex = overlapping.indexOf(pawn);
+                          final int totalOverlapping = overlapping.length;
 
-                            return PawnWidget(
-                              // Stable key prevents unnecessary widget recycling.
-                              key: ValueKey('${pawn.color.name}_${pawn.id}'),
-                              pawn: pawn,
-                              boardSize: boardSize,
-                              isCurrentTurn:
-                                  gameProvider.currentTurn == pawn.color,
-                              overlapIndex: overlapIndex,
-                              totalOverlapping: totalOverlapping,
-                              onTap: () {
-                                debugPrint("Pawn tapped from board");
-                                gameProvider.movePawn(pawn);
-                              },
-                            );
-                          }).toList()
-                          // ─── Sort: current player's pawns paint last (highest z) ───
-                          ..sort((a, b) {
-                            bool aIsCurrent =
-                                a.pawn.color == gameProvider.currentTurn;
+                          return PawnWidget(
+                            // Stable key prevents unnecessary widget recycling.
+                            key: ValueKey('${pawn.color.name}_${pawn.id}'),
+                            pawn: pawn,
+                            boardSize: boardSize,
+                            isCurrentTurn: currentTurn == pawn.color,
+                            overlapIndex: overlapIndex,
+                            totalOverlapping: totalOverlapping,
+                            onTap: () {
+                              gameProvider.movePawn(pawn);
+                            },
+                          );
+                        }).toList()
+                        // ─── Sort: current player's pawns paint last (highest z) ───
+                        ..sort((a, b) {
+                          bool aIsCurrent = a.pawn.color == currentTurn;
 
-                            bool bIsCurrent =
-                                b.pawn.color == gameProvider.currentTurn;
+                          bool bIsCurrent = b.pawn.color == currentTurn;
 
-                            if (aIsCurrent && !bIsCurrent) return 1;
-                            if (!aIsCurrent && bIsCurrent) return -1;
+                          if (aIsCurrent && !bIsCurrent) return 1;
+                          if (!aIsCurrent && bIsCurrent) return -1;
 
-                            return 0;
-                          }),
+                          return 0;
+                        }),
 
                         // ─── 3. WINNING LOTTIE ANIMATION ───
                         // Shown over the entire board when a pawn reaches the center.
@@ -324,65 +320,13 @@ class _BoardLayer extends StatelessWidget {
                           ),
 
                         // -- player names-----
-                        ...gameProvider.players.map((player) {
-                          double padding = boardSize.width * 0;
-                          bool shouldFlip =
-                              player.color == PlayerColor.green ||
-                              player.color == PlayerColor.yellow;
-                          return Positioned(
-                            left:
-                                (player.color == PlayerColor.green ||
-                                    player.color == PlayerColor.red)
-                                ? padding
-                                : null,
-                            right:
-                                (player.color == PlayerColor.yellow ||
-                                    player.color == PlayerColor.blue)
-                                ? padding
-                                : null,
-                            top:
-                                (player.color == PlayerColor.green ||
-                                    player.color == PlayerColor.yellow)
-                                ? padding
-                                : null,
-                            bottom:
-                                (player.color == PlayerColor.red ||
-                                    player.color == PlayerColor.blue)
-                                ? padding
-                                : null,
-                            child: Transform.rotate(
-                              angle: shouldFlip ? math.pi : 0,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withAlpha(230),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: Colors.black54,
-                                    width: 1.5,
-                                  ),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Colors.black26,
-                                      blurRadius: 4,
-                                    ),
-                                  ],
-                                ),
-                                child: Text(
-                                  player.name,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize:
-                                        boardSize.width *
-                                        0.030, // Scales dynamically
-                                    color: Colors.black87,
-                                  ),
-                                ),
-                              ),
-                            ),
+                        ...players.map((player) {
+                          if (!gameProvider.isPlayerInGame(player.color)) {
+                            return const SizedBox.shrink();
+                          }
+                          return _PlayerNameLabel(
+                            player: player,
+                            boardSize: boardSize,
                           );
                         }),
                         ...removedPlayers.map((color) {
@@ -450,6 +394,64 @@ class _BoardLayer extends StatelessWidget {
         ),
         const SizedBox(height: 20),
       ],
+    );
+  }
+}
+
+/// Private widget to render player name labels, reducing BoardLayer complexity.
+class _PlayerNameLabel extends StatelessWidget {
+  final Player player;
+  final Size boardSize;
+
+  const _PlayerNameLabel({required this.player, required this.boardSize});
+
+  @override
+  Widget build(BuildContext context) {
+    double padding = boardSize.width * 0;
+    bool shouldFlip =
+        player.color == PlayerColor.green || player.color == PlayerColor.yellow;
+
+    return Positioned(
+      left:
+          (player.color == PlayerColor.green || player.color == PlayerColor.red)
+              ? padding
+              : null,
+      right:
+          (player.color == PlayerColor.yellow ||
+                  player.color == PlayerColor.blue)
+              ? padding
+              : null,
+      top:
+          (player.color == PlayerColor.green ||
+                  player.color == PlayerColor.yellow)
+              ? padding
+              : null,
+      bottom:
+          (player.color == PlayerColor.red || player.color == PlayerColor.blue)
+              ? padding
+              : null,
+      child: Transform.rotate(
+        angle: shouldFlip ? math.pi : 0,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: Colors.black54, width: 1.5),
+            boxShadow: const [
+              BoxShadow(color: Colors.black26, blurRadius: 4),
+            ],
+          ),
+          child: Text(
+            player.name,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: boardSize.width * 0.030,
+              color: Colors.black87,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

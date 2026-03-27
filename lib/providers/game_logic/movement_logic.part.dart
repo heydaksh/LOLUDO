@@ -7,8 +7,9 @@ extension GameProviderMovement on GameProvider {
     if (!hasRolled) return false;
 
     if (useReverseMode && pawn.hasReverse) {
-      if (pawn.state == PawnState.inBase || pawn.state == PawnState.finished)
+      if (pawn.state == PawnState.inBase || pawn.state == PawnState.finished) {
         return false;
+      }
       if (pawn.step == 0) return false;
       return true;
     }
@@ -64,13 +65,18 @@ extension GameProviderMovement on GameProvider {
     }
     try {
       isAnimatingMove = true;
-      debugPrint(' [MOVE START] Moving ${pawn.color.name} pawn ${pawn.id}');
 
       if (pawn.state == PawnState.inBase &&
           (diceResult == 6 || diceResult == 12)) {
         pawn.state = PawnState.onPath;
         pawn.step = 0;
         hasRolled = false;
+        syncPawnState(pawn);
+        if (isOnlineMultiplayer) {
+          await _db.child('rooms/$currentOnlineRoomId').update({
+            'hasRolled': false,
+          });
+        }
         AudioManager.playBaseExit();
         triggerBotTurn(); // Tell the bot to roll again after leaving base
         return;
@@ -85,22 +91,25 @@ extension GameProviderMovement on GameProvider {
         for (int i = 0; i < stepToTake; i++) {
           if (isReversing) {
             if (pawn.step > 0) pawn.step--;
+            if (pawn.step < 51 && pawn.state == PawnState.onHomeStretch) {
+              pawn.state = PawnState.onPath;
+            }
           } else {
             pawn.step++;
+            if (pawn.step >= 51 && pawn.state == PawnState.onPath) {
+              pawn.state = PawnState.onHomeStretch;
+            }
           }
 
           if (pawn.step >= 51 && pawn.state == PawnState.onPath) {
             pawn.state = PawnState.onHomeStretch;
-            debugPrint(
-              ' [HOME STRETCH] ${pawn.color.name} pawn ${pawn.id} entered home stretch.',
-            );
           }
 
           if (pawn.step == 56) {
             pawn.isWinningAnimation = true;
             AudioManager.playTriangleReach();
             refresh();
-            await Future.delayed(const Duration(milliseconds: 650));
+            await Future.delayed(AppConfig.postMoveDelay);
 
             if (isGameOver || pawn.state == PawnState.inBase) {
               debugPrint(
@@ -115,7 +124,9 @@ extension GameProviderMovement on GameProvider {
           }
 
           refresh();
-          await Future.delayed(const Duration(milliseconds: 250));
+          syncPawnState(pawn);
+          // Add small pause before checking capture
+          await Future.delayed(AppConfig.captureExecutionDelay);
 
           if (isGameOver || pawn.state == PawnState.inBase) {
             debugPrint(
@@ -132,7 +143,7 @@ extension GameProviderMovement on GameProvider {
             if (intermediateCut) cutOpponent = true;
           }
           if (pawn.step == 56) {
-            Future.delayed(const Duration(milliseconds: 600), () {
+            Future.delayed(AppConfig.respawnStartDelay, () {
               pawn.isWinningAnimation = false;
               _checkWinCondition(pawn.color);
               refresh();
@@ -164,12 +175,28 @@ extension GameProviderMovement on GameProvider {
         _checkWinCondition(currentTurn);
         bool playerJustWon = winner.contains(currentTurn);
 
+        // Wait for special sounds (kill/win) to finish before proceeding
+        if (cutOpponent || pawn.state == PawnState.finished) {
+          int timeoutCounter = 0;
+          while (isPaused ||
+              (AudioManager.isSoundPlaying && timeoutCounter < 100)) {
+            await Future.delayed(AppConfig.soundCheckInterval);
+            if (!isPaused && AudioManager.isSoundPlaying) timeoutCounter++;
+          }
+        }
+
         if (!playerJustWon &&
             (diceResult == 6 ||
                 cutOpponent ||
                 pawn.state == PawnState.finished)) {
           debugPrint(' [BONUS TURN] ${pawn.color.name} granted extra turn.');
           hasRolled = false;
+          // [FIXED]: Firebase must be notified of bonus turn so it doesn't lock your dice!
+          if (isOnlineMultiplayer && currentOnlineRoomId != null) {
+            await _db.child('rooms/$currentOnlineRoomId').update({
+              'hasRolled': false,
+            });
+          }
           triggerBotTurn();
         } else {
           nextTurn();
@@ -178,6 +205,8 @@ extension GameProviderMovement on GameProvider {
     } finally {
       isAnimatingMove = false;
       debugPrint(' [MOVE END] Sequence finished.');
+      syncPawnState(pawn);
+
       refresh();
     }
   }
@@ -187,10 +216,6 @@ extension GameProviderMovement on GameProvider {
 
     for (var portal in activePortals) {
       if (absolutePos == portal.a || absolutePos == portal.b) {
-        debugPrint(
-          '🌀 [TELEPORT] Pawn ${pawn.id} entered ${portal.type.name} portal!',
-        );
-
         lastTeleportedPawn = pawn;
         refresh();
 
@@ -225,7 +250,7 @@ extension GameProviderMovement on GameProvider {
           newStep = 56;
         }
 
-        await Future.delayed(const Duration(milliseconds: 300));
+        await Future.delayed(AppConfig.portalPreTeleportDelay);
 
         if (isGameOver || pawn.state == PawnState.inBase) {
           debugPrint('[TELEPORT ABORTED] Game reset during portal sequence.');
@@ -234,6 +259,7 @@ extension GameProviderMovement on GameProvider {
 
         AudioManager.playPortalTeleport();
         pawn.step = newStep;
+        syncPawnState(pawn);
 
         if (pawn.step >= 51 && pawn.state == PawnState.onPath) {
           pawn.state = PawnState.onHomeStretch;
@@ -244,7 +270,8 @@ extension GameProviderMovement on GameProvider {
         }
 
         refresh();
-        await Future.delayed(const Duration(milliseconds: 500));
+        // Short visual pause so it registers on its cell.
+        await Future.delayed(AppConfig.moveConsequenceDelay);
         if (isGameOver || pawn.state == PawnState.inBase) return false;
 
         lastTeleportedPawn = null;

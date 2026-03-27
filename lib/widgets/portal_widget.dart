@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:ludo_game/models/portals.dart';
+import 'package:ludo_game/utils/app_config.dart';
 
 /// ==============================
 /// PORTAL WIDGET
@@ -11,11 +12,13 @@ import 'package:ludo_game/models/portals.dart';
 class PortalWidget extends StatefulWidget {
   final PortalType type;
   final int remainingTurns;
+  final double size; // Added size property
 
   const PortalWidget({
     super.key,
     required this.type,
     required this.remainingTurns,
+    this.size = 32, // Default size
   });
 
   @override
@@ -36,7 +39,7 @@ class _PortalWidgetState extends State<PortalWidget>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 4),
+      duration: AppConfig.portalWidgetLongDuration,
     )..repeat();
   }
 
@@ -88,9 +91,9 @@ class _PortalWidgetState extends State<PortalWidget>
 
   Widget _buildOuterGlow(Color color) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 500),
-      width: 32,
-      height: 32,
+      duration: AppConfig.portalWidgetShortDuration,
+      width: widget.size,
+      height: widget.size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         boxShadow: [

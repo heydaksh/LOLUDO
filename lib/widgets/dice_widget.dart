@@ -1,35 +1,14 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:ludo_game/models/game_models.dart';
 import 'package:ludo_game/providers/game_provider.dart';
+import 'package:ludo_game/utils/app_config.dart';
 import 'package:ludo_game/utils/audio_manager.dart';
 import 'package:provider/provider.dart';
 
-// ==============================
-// DICE WIDGET
-// Displays an animated dice on the board.
-//
-// Visual states:
-//   • Waiting to roll → bounces up/down rhythmically.
-//   • Rolling         → spins in 3-D and rapidly cycles through random faces.
-//   • Rolled          → shows the final result, border changes to neutral.
-//
-// Animation controllers:
-//   _bounceController  — gentle up/down bob when waiting for input.
-//   _rotateController  — 3-D spin triggered on tap.
-//
-// Internal dice display (_displayValue) is updated independently of the
-// provider's diceResult so the animation can show random faces while rolling.
-//
-// The dice border color matches the current player's color.
-// ==============================
-
-/// Record type used with context.select to subscribe only to the 5 relevant
-/// GameProvider fields, preventing unnecessary rebuilds on unrelated changes.
 typedef _DiceState = ({
   bool isDiceRolling,
   bool hasRolled,
@@ -47,70 +26,30 @@ class DiceWidget extends StatefulWidget {
 }
 
 class _DiceWidgetState extends State<DiceWidget> with TickerProviderStateMixin {
-  // ==============================
-  // STATE VARIABLES
-  // ==============================
-
-  /// The number currently displayed on the dice face.
-  /// Rapidly cycles through random values during the rolling animation.
   int _displayValue = 1;
-
-  /// Periodic timer used to shuffle _displayValue during the rolling animation.
-  // ADJUSTABLE: Change the face-shuffle interval during rolling (currently 50 ms).
   Timer? _rollingTimer;
 
-  // ==============================
-  // ANIMATION CONTROLLERS
-  // ==============================
-
-  /// Drives the vertical bounce animation shown when the dice is waiting to be rolled.
-  // ADJUSTABLE: Change bounce animation duration here (currently 200 ms).
   late AnimationController _bounceController;
-
-  /// Drives the 3-D spin animation triggered on tap.
-  // ADJUSTABLE: Change spin animation duration here (currently 600 ms).
   late AnimationController _rotateController;
-
-  // ─── Animations ───
-
-  /// Translates the dice upward by 15 px during the bounce.
-  // ADJUSTABLE: Change bounce height here (begin: 0, end: -15 px).
   late Animation<double> _bounceAnimation;
-
-  /// Rotates the dice from 0 to 4π (two full spins) for the roll animation.
-  // ADJUSTABLE: Change total rotation amount here (end: math.pi * 4 = 2 full spins).
   late Animation<double> _rotateAnimation;
-
-  // ─── Local audio player ───
-  // Not actively used for playback; AudioManager handles sounds.
-  final AudioPlayer _audioPlayer = AudioPlayer();
-
-  /// Tracks whether the dice was in "waiting for input" state on the previous frame.
-  /// Used to correctly transition the bounce animation on/off.
   bool _wasWaitingForInput = false;
-
-  // ==============================
-  // LIFECYCLE METHODS
-  // ==============================
 
   @override
   void initState() {
     super.initState();
-
-    // ─── Bounce Controller ───
     _bounceController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 200), // ADJUSTABLE: Bounce speed.
+      duration: AppConfig.diceBounceDuration,
     );
 
     _bounceAnimation = Tween<double>(begin: 0, end: -15).animate(
       CurvedAnimation(parent: _bounceController, curve: Curves.easeInOut),
     );
 
-    // ─── Rotate Controller ───
     _rotateController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600), // ADJUSTABLE: Spin speed.
+      duration: AppConfig.diceSpinDuration,
     );
 
     _rotateAnimation = Tween<double>(begin: 0, end: math.pi * 4).animate(
@@ -119,110 +58,53 @@ class _DiceWidgetState extends State<DiceWidget> with TickerProviderStateMixin {
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-
-    final p = context.read<GameProvider>();
-    final bool isDiceRolling = p.isDiceRolling;
-    final bool hasRolled = p.hasRolled;
-    final int diceResult = p.diceResult;
-    final bool hasWinner = p.isGameOver;
-
-    // Sync _displayValue with the provider result only when not mid-animation.
-    if (!isDiceRolling && _rollingTimer?.isActive != true) {
-      _displayValue = diceResult;
-    }
-
-    // The dice bounces when it's idle and waiting to be tapped.
-    final bool shouldBounce = !isDiceRolling && !hasRolled && !hasWinner;
-
-    // Start bouncing if transitioning into "waiting for input" state.
-    if (shouldBounce && !_wasWaitingForInput) {
-      if (!_bounceController.isAnimating) {
-        _bounceController.repeat(reverse: true);
-      }
-    }
-
-    // Stop bouncing when the state changes away from "waiting for input".
-    if (!shouldBounce && _wasWaitingForInput) {
-      if (_bounceController.isAnimating) {
-        _bounceController.stop();
-        // Smoothly settle back to neutral position.
-        // ADJUSTABLE: Change the settle animation duration here (currently 300 ms).
-        _bounceController.animateTo(
-          0,
-          duration: const Duration(milliseconds: 300),
-        );
-      }
-    }
-
-    _wasWaitingForInput = shouldBounce;
-  }
-
-  // ==============================
-  // ROLLING ANIMATION
-  // ==============================
-
-  /// Initiates the full roll sequence:
-  ///   1. Plays dice roll sound.
-  ///   2. Triggers the 3-D spin animation.
-  ///   3. Starts a periodic timer to shuffle display values (random face effect).
-  ///   4. After 600 ms, stops the timer and locks display to the real result.
-  ///   5. Awaits the provider's rollDice() to complete (applies game rules).
-  Future<void> _startRollingAnimation(GameProvider gameProvider) async {
-    if (_rollingTimer?.isActive ?? false) return;
-    AudioManager.playDiceRoll();
-
-    // Start provider logic in parallel with the animation.
-    Future<void> rollFuture = gameProvider.rollDice();
-
-    // Kick off the 3-D spin.
-    _rotateController.reset();
-    _rotateController.forward();
-
-    // Rapidly shuffle the displayed number to simulate randomness.
-    // ADJUSTABLE: Change shuffle tick rate here (currently 50 ms per face).
-    _rollingTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
-      if (!mounted) return;
-      setState(() {
-        _displayValue = math.Random().nextInt(6) + 1;
-      });
-    });
-
-    // ADJUSTABLE: Change how long the face-shuffle runs before showing the result (currently 600 ms).
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    _rollingTimer?.cancel();
-
-    // Snap to the actual result.
-    if (mounted) {
-      setState(() {
-        _displayValue = gameProvider.diceResult;
-      });
-    }
-
-    // Wait for the provider's rollDice() to fully complete before allowing input.
-    await rollFuture;
-  }
-
-  @override
   void dispose() {
     _rollingTimer?.cancel();
     _bounceController.dispose();
     _rotateController.dispose();
-    _audioPlayer.dispose();
     super.dispose();
   }
 
-  // ==============================
-  // BUILD METHOD
-  // ==============================
+  // Creates authentic Ludo dice dots instead of text/icons
+  // Creates authentic Ludo dice dots instead of text/icons
+  Widget _buildDiceDots(int value, Color color, double size) {
+    final double dotSize = size / 5.0; // Adjusted dot size
+
+    Widget dot() => Container(
+      width: dotSize,
+      height: dotSize,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    );
+
+    // [FIXED]: Added SizedBox so the Stack takes up the full dice space!
+    // Varna saare dots center me overlap ho kar 1 dot dikhte hain.
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Padding(
+        padding: EdgeInsets.all(size / 5.5),
+        child: Stack(
+          children: [
+            if (value > 1) Align(alignment: Alignment.topRight, child: dot()),
+            if (value > 3) Align(alignment: Alignment.topLeft, child: dot()),
+            if (value == 6)
+              Align(alignment: Alignment.centerLeft, child: dot()),
+            if (value % 2 != 0)
+              Align(alignment: Alignment.center, child: dot()),
+            if (value == 6)
+              Align(alignment: Alignment.centerRight, child: dot()),
+            if (value > 3)
+              Align(alignment: Alignment.bottomRight, child: dot()),
+            if (value > 1) Align(alignment: Alignment.bottomLeft, child: dot()),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-
-    // dice responsive size
     final double diceWidth = size.width / 5.5;
     final double diceHeight = size.width / 7;
 
@@ -242,6 +124,55 @@ class _DiceWidgetState extends State<DiceWidget> with TickerProviderStateMixin {
         !state.hasRolled &&
         !state.hasWinner &&
         !state.isAnimatingMove;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      if (state.isDiceRolling) {
+        if (!(_rollingTimer?.isActive ?? false)) {
+          AudioManager.playDiceRoll();
+          _rotateController.reset();
+          _rotateController.forward();
+
+          _rollingTimer = Timer.periodic(AppConfig.diceFaceShuffleInterval, (
+            timer,
+          ) {
+            if (!mounted) return;
+            setState(() {
+              _displayValue = math.Random().nextInt(6) + 1;
+            });
+          });
+        }
+      } else {
+        if (_rollingTimer?.isActive ?? false) {
+          _rollingTimer?.cancel();
+          setState(() {
+            _displayValue = state.diceResult;
+          });
+        } else if (_displayValue != state.diceResult &&
+            !state.isAnimatingMove) {
+          setState(() {
+            _displayValue = state.diceResult;
+          });
+        }
+      }
+
+      if (shouldBounce) {
+        if (!_wasWaitingForInput) {
+          _bounceController.repeat(reverse: true);
+          _wasWaitingForInput = true;
+        }
+      } else {
+        if (_wasWaitingForInput) {
+          _bounceController.stop();
+          _bounceController.animateTo(
+            0,
+            duration: AppConfig.diceBounceReturnDuration,
+          );
+          _wasWaitingForInput = false;
+        }
+      }
+    });
 
     Color turnColor;
     switch (state.currentTurn) {
@@ -266,8 +197,16 @@ class _DiceWidgetState extends State<DiceWidget> with TickerProviderStateMixin {
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
+        final provider = context.read<GameProvider>();
+
+        if (provider.isPaused) return;
+        if (provider.isOnlineMultiplayer &&
+            provider.currentTurn != provider.myLocalColor) {
+          return;
+        }
+
         if (shouldBounce) {
-          _startRollingAnimation(context.read<GameProvider>());
+          provider.rollDice();
         }
       },
       child: Transform.rotate(
@@ -284,7 +223,6 @@ class _DiceWidgetState extends State<DiceWidget> with TickerProviderStateMixin {
             animation: _rotateAnimation,
             builder: (context, child) {
               final double value = _rotateAnimation.value;
-
               final Matrix4 transform = Matrix4.identity()
                 ..setEntry(3, 2, 0.0014)
                 ..rotateX(value)
@@ -318,15 +256,12 @@ class _DiceWidgetState extends State<DiceWidget> with TickerProviderStateMixin {
                   width: state.hasRolled ? size.width / 200 : size.width / 160,
                 ),
               ),
-              child: Center(
-                child: Text(
-                  '$_displayValue',
-                  style: TextStyle(
-                    fontSize: size.width / 9,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
+              child: _buildDiceDots(
+                _displayValue,
+                state.hasRolled
+                    ? Colors.black87
+                    : turnColor.withValues(alpha: 0.9),
+                math.min(diceWidth, diceHeight),
               ),
             ),
           ),

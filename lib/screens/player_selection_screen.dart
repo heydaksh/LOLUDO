@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:ludo_game/models/game_models.dart';
 import 'package:ludo_game/screens/developer_detail_screen.dart';
 import 'package:ludo_game/screens/rotating_card.dart';
+import 'package:ludo_game/utils/app_config.dart';
 
 class PlayerSelectionScreen extends StatefulWidget {
   const PlayerSelectionScreen({super.key});
@@ -21,7 +22,8 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
     TextEditingController(text: "Red"),
   ];
 
-  final List<bool> _isBotList = [false, true, true, true];
+  final List<bool> _isBotList = [false, false, false, false];
+
   @override
   void dispose() {
     for (var controller in _nameControllers) {
@@ -94,63 +96,123 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
             _togglePlayer(index);
           },
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
+            duration: AppConfig.playerSelectionTransitionDuration,
             width: size.width / 3.6,
             height: size.width / 3.6,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(size.width / 20),
+              borderRadius: BorderRadius.circular(size.width / 18),
+
+              /// 🔥 NEW: layered gradient + depth
               gradient: active
                   ? LinearGradient(
-                      colors: [color, color.withValues(alpha: 0.75)],
+                      colors: [
+                        color,
+                        color.withValues(alpha: 0.7),
+                        Colors.black.withValues(alpha: 0.2),
+                      ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     )
                   : null,
-              color: active ? null : color.withValues(alpha: 0.55),
+
+              color: active ? null : color.withValues(alpha: 0.35),
+
+              /// 🔥 stronger border
               border: Border.all(
                 color: active ? Colors.white : Colors.transparent,
                 width: size.width / 120,
               ),
+
+              /// 🔥 glow + elevation
               boxShadow: active
                   ? [
                       BoxShadow(
-                        color: color.withValues(alpha: 0.6),
-                        blurRadius: size.width / 22,
-                        spreadRadius: size.width / 150,
+                        color: color.withValues(alpha: 0.7),
+                        blurRadius: size.width / 18,
+                        spreadRadius: size.width / 120,
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        blurRadius: size.width / 30,
+                        offset: Offset(0, size.height / 200),
                       ),
                     ]
                   : [],
             ),
-            child: Center(
-              child: Container(
-                width: size.width / 8,
-                height: size.width / 8,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white,
+
+            ///  inner content
+            child: Stack(
+              children: [
+                /// selection indicator
+                if (active)
+                  Positioned(
+                    top: size.height / 120,
+                    right: size.width / 60,
+                    child: Icon(
+                      Icons.check_circle,
+                      color: Colors.white,
+                      size: size.width / 14,
+                    ),
+                  ),
+
+                Center(
+                  child: AnimatedScale(
+                    scale: active ? 1 : 0.9,
+                    duration: AppConfig.toggleButtonAnimationDuration,
+                    child: Container(
+                      width: size.width / 7,
+                      height: size.width / 7,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: size.width / 40,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.person,
+                        color: color,
+                        size: size.width / 10,
+                      ),
+                    ),
+                  ),
                 ),
-                child: active
-                    ? Icon(Icons.check, color: color, size: size.width / 12)
-                    : null,
-              ),
+              ],
             ),
           ),
         ),
 
         SizedBox(height: size.height / 120),
 
+        /// 🔥 IMPROVED NAME FIELD
         SizedBox(
-          width: size.width / 3.6,
+          width: size.width / 3.1,
           child: TextField(
+            maxLength: 10,
             controller: _nameControllers[index],
             enabled: active,
             textAlign: TextAlign.center,
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              fontSize: size.width / 32,
-              color: active ? Colors.black : Colors.grey.shade600,
+              fontSize: size.width / 30,
+              color: active ? Colors.black : Colors.grey.shade900,
             ),
             decoration: InputDecoration(
+              counterText: '',
+              filled: true,
+              fillColor: active ? Colors.white : Colors.grey.shade300,
+
+              contentPadding: EdgeInsets.symmetric(vertical: size.height / 140),
+
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(size.width / 30),
+                borderSide: BorderSide.none,
+              ),
+
+              /// 🔥 BOT TOGGLE REDESIGN
               suffixIcon: GestureDetector(
                 onTap: () {
                   HapticFeedback.lightImpact();
@@ -158,24 +220,36 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
                     _isBotList[index] = !_isBotList[index];
                   });
                 },
-                child: Icon(
-                  _isBotList[index] ? Icons.smart_toy_outlined : Icons.person,
-                  color: active ? color : Colors.grey,
-                  size: size.width / 20,
+                child: Container(
+                  margin: EdgeInsets.all(size.width / 70),
+                  padding: EdgeInsets.symmetric(horizontal: size.width / 40),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(size.width / 40),
+                    color: _isBotList[index]
+                        ? Colors.black
+                        : Colors.grey.shade500,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _isBotList[index] ? Icons.smart_toy : Icons.person,
+                        color: Colors.white,
+                        size: size.width / 22,
+                      ),
+                      SizedBox(width: size.width / 80),
+                      Text(
+                        _isBotList[index] ? "BOT" : "",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: size.width / 40,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              isDense: true,
-              contentPadding: EdgeInsets.symmetric(
-                vertical: size.height / 140,
-                horizontal: size.width / 60,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(size.width / 40),
-              ),
-              filled: true,
-              fillColor: active
-                  ? Colors.white.withValues(alpha: 0.9)
-                  : Colors.grey.shade300,
             ),
           ),
         ),

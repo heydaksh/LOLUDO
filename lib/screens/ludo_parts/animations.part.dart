@@ -13,13 +13,16 @@ class _TeleportFlashOverlay extends StatelessWidget {
     final teleportedPawn = context.select<GameProvider, Pawn?>(
       (p) => p.lastTeleportedPawn,
     );
+    final isAnimatingMove = context.select<GameProvider, bool>(
+      (p) => p.isAnimatingMove,
+    );
 
     if (teleportedPawn == null) return const SizedBox.shrink();
 
     return IgnorePointer(
       child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 200),
-        opacity: 0.3,
+        duration: AppConfig.fastUiAnimationDuration,
+        opacity: isAnimatingMove ? 0.3 : 1.0,
         child: Container(color: Colors.white),
       ),
     );
@@ -49,7 +52,7 @@ class _GameStartBlinkerState extends State<_GameStartBlinker>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 330),
+      duration: AppConfig.moderateUiAnimationDuration,
     );
     _playAnimation();
   }

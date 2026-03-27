@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "310419058390",
+    "firebase_url": "https://loludo-flutter-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "loludo-flutter",
+    "storage_bucket": "loludo-flutter.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:310419058390:android:6147a9822c08c142a02377",
+        "android_client_info": {
+          "package_name": "com.example.ludo_game"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyClCl6n8U7i5ne-E7CAa6duLLXrhxbX6FY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

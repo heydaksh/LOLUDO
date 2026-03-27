@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:ludo_game/models/game_models.dart';
 import 'package:ludo_game/providers/game_provider.dart';
-import 'package:ludo_game/screens/player_selection_screen.dart';
+import 'package:ludo_game/screens/start_screen.dart';
+import 'package:ludo_game/utils/app_config.dart';
 import 'package:provider/provider.dart';
 
 class VictoryOverlay extends StatefulWidget {
@@ -29,13 +30,23 @@ class _VictoryOverlayState extends State<VictoryOverlay>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: AppConfig.victoryOverlayDuration,
     )..forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+
+    if (widget.allPlayers.isEmpty || widget.winners.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     final loser = widget.allPlayers.firstWhere(
       (p) => !widget.winners.contains(p.color),
@@ -99,7 +110,11 @@ class _VictoryOverlayState extends State<VictoryOverlay>
                     ),
                     borderRadius: BorderRadius.circular(size.width / 20),
                     border: Border.all(
-                      color: _getColor(widget.winners.first),
+                      color: _getColor(
+                        widget.winners.isNotEmpty
+                            ? widget.winners.first
+                            : PlayerColor.green,
+                      ),
                       width: size.width / 100,
                     ),
                     boxShadow: const [
@@ -126,7 +141,8 @@ class _VictoryOverlayState extends State<VictoryOverlay>
                       SizedBox(height: 5),
 
                       /// WINNER
-                      _buildWinner(size, widget.winners.first),
+                      if (widget.winners.isNotEmpty)
+                        _buildWinner(size, widget.winners.first),
 
                       SizedBox(height: 10),
 
@@ -159,11 +175,11 @@ class _VictoryOverlayState extends State<VictoryOverlay>
                           context.read<GameProvider>().restartGame();
                         },
                         style: ElevatedButton.styleFrom(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: size.width / 7,
-                            vertical: size.height / 60,
+                          backgroundColor: _getColor(
+                            widget.winners.isNotEmpty
+                                ? widget.winners.first
+                                : PlayerColor.green,
                           ),
-                          backgroundColor: _getColor(widget.winners.first),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(
                               size.width / 10,
@@ -181,30 +197,23 @@ class _VictoryOverlayState extends State<VictoryOverlay>
                       ),
                       SizedBox(height: 10),
                       ElevatedButton(
-                        onPressed: () async {
-                          final Map<PlayerColor, PlayerSetup>? result =
-                              await Navigator.push<
-                                Map<PlayerColor, PlayerSetup>
-                              >(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const PlayerSelectionScreen(),
-                                ),
-                              );
-                          // Re-initialize the game with the newly chosen players/names.
-                          if (result != null && context.mounted) {
-                            context.read<GameProvider>().restartGame();
-                            context.read<GameProvider>().initializePlayers(
-                              result,
-                            );
-                          }
+                        onPressed: () {
+                          context.read<GameProvider>().exitGame();
+                          // Flush the stack and cleanly return to the Start Screen
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const StartScreen(),
+                            ),
+                            (route) => false,
+                          );
                         },
                         style: ElevatedButton.styleFrom(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: size.width / 10,
-                            vertical: size.height / 60,
+                          backgroundColor: _getColor(
+                            widget.winners.isNotEmpty
+                                ? widget.winners.first
+                                : PlayerColor.green,
                           ),
-                          backgroundColor: _getColor(widget.winners.first),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(
                               size.width / 10,
@@ -212,7 +221,7 @@ class _VictoryOverlayState extends State<VictoryOverlay>
                           ),
                         ),
                         child: Text(
-                          "Exit",
+                          "Exit to Menu", // Better wording
                           style: TextStyle(
                             fontSize: size.width / 22,
                             fontWeight: FontWeight.bold,
@@ -233,7 +242,9 @@ class _VictoryOverlayState extends State<VictoryOverlay>
 
   /// TOP WINNER
   Widget _buildWinner(Size size, PlayerColor color) {
-    String name = widget.allPlayers.firstWhere((p) => p.color == color).name;
+    String name = widget.allPlayers
+        .firstWhere((p) => p.color == color, orElse: () => widget.allPlayers.first)
+        .name;
 
     return Column(
       children: [
@@ -279,7 +290,9 @@ class _VictoryOverlayState extends State<VictoryOverlay>
 
     if (isLoser) rankText = "LOSS";
 
-    String name = widget.allPlayers.firstWhere((p) => p.color == color).name;
+    String name = widget.allPlayers
+        .firstWhere((p) => p.color == color, orElse: () => widget.allPlayers.first)
+        .name;
 
     return Container(
       margin: EdgeInsets.symmetric(vertical: size.height / 120),

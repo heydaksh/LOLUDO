@@ -27,6 +27,7 @@ extension GameProviderPower on GameProvider {
     if (powerIndex != -1) {
       Power power = activePower.removeAt(powerIndex);
       debugPrint('🌟 [POWER] ${pawn.color.name} picked up ${power.type.name}!');
+      if (isOnlineMultiplayer) syncBoardState();
       await _applyPower(pawn, power.type);
     }
   }
@@ -35,6 +36,7 @@ extension GameProviderPower on GameProvider {
     switch (type) {
       case PowerType.shield:
         pawn.shieldTurn = 1;
+        syncPawnState(pawn);
         debugPrint(
           '🛡️ [SHIELD] Shield activated for ${pawn.color.name} pawn!',
         );
@@ -42,6 +44,7 @@ extension GameProviderPower on GameProvider {
 
       case PowerType.reverse:
         pawn.hasReverse = true;
+        syncPawnState(pawn);
         debugPrint(
           '🔄 [REVERSE] Reverse activated for ${pawn.color.name} pawn!',
         );
@@ -84,6 +87,8 @@ extension GameProviderPower on GameProvider {
 
           pawn.step = getRelative(targetAbs, pawn.color);
           target.step = getRelative(myAbs, target.color);
+          syncPawnState(pawn);
+          syncPawnState(target);
           debugPrint('🔄 [SWAP] Swapped with ${target.color.name} pawn!');
         } else {
           debugPrint(

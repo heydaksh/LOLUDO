@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:ludo_game/utils/app_config.dart';
 import 'package:ludo_game/models/powers.dart';
 
 /// ==============================
@@ -32,7 +33,7 @@ class _PowerWidgetState extends State<PowerWidget>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: AppConfig.powerWidgetDuration,
     )..repeat(reverse: true);
 
     _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(

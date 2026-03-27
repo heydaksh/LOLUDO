@@ -18,6 +18,11 @@ class AudioManager {
   // INTERNAL STATE
   // ==============================
 
+  /// Returns whether any sound is currently playing.
+  static bool get isSoundPlaying =>
+      _effectPlayer.state == PlayerState.playing ||
+      _safeZonePlayer.state == PlayerState.playing;
+
   /// Random generator for selecting random sound variations.
   static final Random _random = Random();
 
@@ -47,6 +52,9 @@ class AudioManager {
     'kill_Sound/ramayan_gayab.wav',
     'kill_Sound/tehelka_omlette.wav',
     'kill_Sound/laugh.wav',
+    'kill_Sound/laugh2.wav',
+    'kill_Sound/gta_kill.wav',
+    'kill_Sound/pew_kill.wav',
   ];
 
   /// Sounds played when a pawn exits the base (rolled a 6).
@@ -54,6 +62,8 @@ class AudioManager {
     'entry/faaah.wav',
     "entry/chaloo.wav",
     "entry/dun_dun_dun.wav",
+    "entry/suuuu.wav",
+    "entry/hato.wav",
   ];
 
   /// Sound played each time a pawn moves one step forward on the path.
@@ -66,7 +76,12 @@ class AudioManager {
   static const List<String> safeHouseSound = ['misc_sounds/safe_zones.wav'];
 
   /// Sounds played when game is won
-  static const List<String> gameWinSound = ['misc_sounds/game_win_sound.wav'];
+  static const List<String> gameWinSound = [
+    'winning/winning.wav',
+    'winning/winning2.wav',
+    'winning/winning3.wav',
+    'winning/winning4.wav',
+  ];
 
   /// Sounds played when game is won
   static const List<String> passTurnSound = ['misc_sounds/pass_turn.wav'];
@@ -79,13 +94,15 @@ class AudioManager {
 
   /// Sound played when a pawn reaches the center winning triangle.
   static const List<String> triangleReachSound = [
-    'misc_sounds/triangle_reach.wav',
+    'triangle_reach/triangle_reach.wav',
+    'triangle_reach/triangle_reach2.wav',
   ];
   // Sound plays when game starts..
   static const List<String> gameStartSound = [
-    'misc_sounds/game_start3.wav',
-    'misc_sounds/game_start.wav',
-    'misc_sounds/game_start2.wav',
+    'game_start/game_start.wav',
+    'game_start/game_start2.wav',
+    'game_start/game_start3.wav',
+    'game_start/game_start4.wav',
   ];
   // Sound plays when any player is removed..
   static const List<String> removePlayerSound = [
@@ -101,10 +118,10 @@ class AudioManager {
   /// Must be called once in [main()] before [runApp()] to ensure
   /// misc_sounds play without noticeable delay during gameplay.
   static Future<void> init() async {
-    await _effectPlayer.setPlayerMode(PlayerMode.lowLatency);
+    await _effectPlayer.setPlayerMode(PlayerMode.mediaPlayer);
     await _effectPlayer.setReleaseMode(ReleaseMode.stop);
 
-    await _safeZonePlayer.setPlayerMode(PlayerMode.lowLatency);
+    await _safeZonePlayer.setPlayerMode(PlayerMode.mediaPlayer);
     await _safeZonePlayer.setReleaseMode(ReleaseMode.stop);
   }
 

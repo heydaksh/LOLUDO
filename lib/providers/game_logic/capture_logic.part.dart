@@ -23,9 +23,9 @@ extension GameProviderCapture on GameProvider {
                   pawn.isDeadAnimation = true;
                   AudioManager.playKnockOut();
                   refresh();
-                  await Future.delayed(const Duration(milliseconds: 100));
+                  await Future.delayed(AppConfig.captureSearchInterval);
                   pawn.reset();
-
+                  syncPawnState(pawn);
                   return false;
                 } else {
                   debugPrint(
@@ -36,9 +36,10 @@ extension GameProviderCapture on GameProvider {
                   AudioManager.playKnockOut();
                   refresh();
 
-                  await Future.delayed(const Duration(milliseconds: 100));
+                  await Future.delayed(AppConfig.captureSearchInterval);
 
                   oppPawn.reset();
+                  syncPawnState(oppPawn);
                   localCut = true;
 
                   if (!eliminateAllOpponents) {

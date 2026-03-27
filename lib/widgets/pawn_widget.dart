@@ -5,6 +5,7 @@ import 'package:ludo_game/providers/game_provider.dart';
 import 'package:provider/provider.dart';
 
 import '../models/game_models.dart';
+import '../utils/app_config.dart';
 import '../utils/board_coordinates.dart';
 
 // ==============================
@@ -85,12 +86,12 @@ class _PawnWidgetState extends State<PawnWidget> with TickerProviderStateMixin {
 
     _highlightController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: AppConfig.pawnHighlightPulseDuration,
     );
 
     _rotationController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 3),
+      duration: AppConfig.pawnSelectionIndicatorRotationDuration,
     )..repeat();
 
     _glowAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
@@ -99,7 +100,7 @@ class _PawnWidgetState extends State<PawnWidget> with TickerProviderStateMixin {
 
     _finishController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 700),
+      duration: AppConfig.pawnFinishAnimationDuration,
     );
 
     _stretch = Tween<double>(begin: 1.0, end: 1.6).animate(
@@ -255,7 +256,7 @@ class _PawnWidgetState extends State<PawnWidget> with TickerProviderStateMixin {
 
     return AnimatedPositioned(
       // ADJUSTABLE: Change pawn slide speed between cells here (currently 220 ms).
-      duration: const Duration(milliseconds: 220),
+      duration: AppConfig.pawnSlideDuration,
       curve: Curves.easeInOut,
       left: position.dx + cellPadding + overlapOffset.dx - hitMargin,
       top: position.dy + cellPadding + overlapOffset.dy - hitMargin,
@@ -265,7 +266,16 @@ class _PawnWidgetState extends State<PawnWidget> with TickerProviderStateMixin {
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () {
-          debugPrint("Pawn tapped : ${widget.pawn.id}");
+          final provider = context.read<GameProvider>();
+
+          if (provider.isPaused) return;
+
+          if (provider.isOnlineMultiplayer &&
+              provider.currentTurn != provider.myLocalColor) {
+            return;
+          }
+
+          debugPrint("Pawn Tapped: ${widget.pawn.id}");
           if (!mounted) return;
           widget.onTap();
         },
@@ -279,7 +289,7 @@ class _PawnWidgetState extends State<PawnWidget> with TickerProviderStateMixin {
             key: ValueKey(widget.pawn.step),
             tween: Tween(begin: 0.0, end: 1.0),
             // ADJUSTABLE: Change per-step jump animation duration here (currently 150 ms).
-            duration: const Duration(milliseconds: 150),
+            duration: AppConfig.pawnJumpDuration,
 
             builder: (context, value, child) {
               // ADJUSTABLE: Change maximum jump height here (currently 15.0 px).
@@ -382,8 +392,10 @@ class _PawnWidgetState extends State<PawnWidget> with TickerProviderStateMixin {
                                     if (widget.pawn.hasReverse)
                                       BoxShadow(
                                         color:
-                                            widget.pawn.state ==
-                                                PawnState.onHomeStretch
+                                            (widget.pawn.state ==
+                                                    PawnState.onHomeStretch ||
+                                                widget.pawn.state ==
+                                                    PawnState.finished)
                                             ? Colors.transparent
                                             : Colors.purpleAccent.withValues(
                                                 alpha: 0.9,
@@ -396,8 +408,10 @@ class _PawnWidgetState extends State<PawnWidget> with TickerProviderStateMixin {
                                     if (widget.pawn.isShielded)
                                       BoxShadow(
                                         color:
-                                            widget.pawn.state ==
-                                                PawnState.onHomeStretch
+                                            (widget.pawn.state ==
+                                                    PawnState.onHomeStretch ||
+                                                widget.pawn.state ==
+                                                    PawnState.finished)
                                             ? Colors.transparent
                                             : Colors.cyanAccent.withValues(
                                                 alpha: 0.9,
@@ -504,7 +518,10 @@ class _PawnWidgetState extends State<PawnWidget> with TickerProviderStateMixin {
                                     ),
 
                                     // -- SUPER POWER ICONS ---
-                                    if (widget.pawn.hasReverse)
+                                    if (widget.pawn.hasReverse &&
+                                        widget.pawn.state !=
+                                            PawnState.onHomeStretch &&
+                                        widget.pawn.state != PawnState.finished)
                                       Positioned(
                                         bottom: pawnSize * 0.85,
                                         child: Icon(
@@ -519,7 +536,10 @@ class _PawnWidgetState extends State<PawnWidget> with TickerProviderStateMixin {
                                           ],
                                         ),
                                       ),
-                                    if (widget.pawn.isShielded)
+                                    if (widget.pawn.isShielded &&
+                                        widget.pawn.state !=
+                                            PawnState.onHomeStretch &&
+                                        widget.pawn.state != PawnState.finished)
                                       Positioned(
                                         bottom: pawnSize * 0.85,
                                         child: Icon(

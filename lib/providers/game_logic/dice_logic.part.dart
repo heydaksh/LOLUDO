@@ -2,19 +2,26 @@ part of '../game_provider.dart';
 
 extension GameProviderDice on GameProvider {
   /// Rolls the dice for the current player.
+  /// Rolls the dice for the current player.
   Future<void> rollDice() async {
     if (isGameOver || isDiceRolling || hasRolled || isAnimatingMove) return;
 
+    // Capture the turn at the START. If it changes during the 600ms roll, we discard.
+    final PlayerColor turnAtStart = currentTurn;
+
+    // Fast-cancel the turn timer locally before even notifying Firebase
+    _turnTimer?.cancel();
     try {
       isDiceRolling = true;
 
-      // Generate the dice value BEFORE notifying listeners
+      // [FIX]: Firebase ko batane se PEHLE number generate karein
       final rand = Random();
 
       if (alwaysRollSix) {
-        diceResult = 4;
+        diceResult = 6;
       } else {
-        diceResult = rand.nextDouble() < 0.19 ? 6 : rand.nextInt(5) + 1;
+        // [FIX]: Normal 1 se 6 probability (Pehle 0.25 par 6 tha, jo unfair tha)
+        diceResult = rand.nextInt(6) + 1;
       }
       debugPrint("Dice rolled: $diceResult");
 
@@ -25,19 +32,34 @@ extension GameProviderDice on GameProvider {
         activePlayer.hasMultiplier = false;
         debugPrint("🎲 Dice Multiplier applied! New roll: $diceResult");
       }
+
+      // [FIX]: AB Firebase ko sync karein, taaki naya number network par chala jaye
+      syncDiceRolling(true);
+
       refresh();
 
       // ADJUSTABLE: Change the dice animation display duration here
-      await Future.delayed(const Duration(milliseconds: 600));
+      await Future.delayed(AppConfig.diceResultDisplayDuration);
     } finally {
-      // Guarantee these resets happen
+      // Guarantee these resets happen before we mark it as "rolled"
       isDiceRolling = false;
     }
 
     hasRolled = true;
+    refresh();
+
+    //  If the turn timed out and changed, we must reset hasRolled so the next player can roll.
+    if (currentTurn != turnAtStart) {
+      debugPrint(
+        "⚠️ [ROLL ABORTED] Turn changed while rolling. Discarding result.",
+      );
+      hasRolled = false;
+      return;
+    }
+
+    syncDiceRoll(diceResult);
 
     // --- AUTOMATION LOGIC ---
-    // Fetch all pawns that can legally move with the current dice result.
     List<Pawn> validPawns = _getValidPawns();
 
     if (validPawns.isEmpty) {
@@ -46,36 +68,39 @@ extension GameProviderDice on GameProvider {
       );
       refresh();
 
-      await Future.delayed(const Duration(milliseconds: 1000));
+      await Future.delayed(AppConfig.autoPassTurnDelay);
       if (isGameOver || !players.any((p) => p.color == currentTurn)) {
         debugPrint('[ROLL ABORTED] Game state changed during dice roll.');
         return;
       }
       nextTurn();
-    }
-    // CONDITION 1, 2, & 3: If exactly 1 valid move exists, automate it!
-    else if (validPawns.length == 1) {
+    } else if (validPawns.length == 1) {
       debugPrint(
         '🤖 [AUTOMATION] Only 1 valid move found. Auto-moving pawn ${validPawns.first.id}.',
       );
       refresh();
 
-      // Short delay so the user can read the dice result before the pawn zips away
-      await Future.delayed(const Duration(milliseconds: 400));
+      await Future.delayed(AppConfig.autoMoveDelay);
+
+      while (isPaused) {
+        await Future.delayed(AppConfig.soundCheckInterval);
+      }
 
       if (isGameOver || !players.any((p) => p.color == currentTurn)) return;
 
-      // Programmatically trigger the move
       movePawn(validPawns.first);
-    }
-    // Multiple options available, wait for user input.
-    else {
+    } else {
       Player activePlayer = players.firstWhere((p) => p.color == currentTurn);
 
       if (activePlayer.isBot) {
-        debugPrint('🤖 [BOT] Deciding between ${validPawns.length} options...');
+        debugPrint(' [BOT] Deciding between ${validPawns.length} options...');
 
-        await Future.delayed(const Duration(milliseconds: 5000));
+        await Future.delayed(AppConfig.botDecisionDelay);
+
+        while (isPaused) {
+          await Future.delayed(AppConfig.soundCheckInterval);
+        }
+
         if (isGameOver || !players.any((p) => p.color == currentTurn)) return;
 
         Pawn bestPawn = _chooseBestPawnForBot(validPawns);
@@ -90,19 +115,124 @@ extension GameProviderDice on GameProvider {
   }
 
   Pawn _chooseBestPawnForBot(List<Pawn> validMoves) {
-    // 1. Can we finish a pawn and score?
-    try {
-      return validMoves.firstWhere((p) => p.step + diceResult == 56);
-    } catch (_) {}
+    Pawn? bestPawn;
+    int highestScore = -9999;
+    final random = Random();
 
-    // 2. Can we get a new pawn out of the base?
-    try {
-      return validMoves.firstWhere((p) => p.state == PawnState.inBase);
-    } catch (_) {}
+    for (var pawn in validMoves) {
+      int moveScore = 0;
 
-    // 3. Fallback: Move the pawn that is furthest along the board
-    validMoves.sort((a, b) => b.step.compareTo(a.step));
-    return validMoves.first;
+      // --- Winning move ----
+      if (pawn.state == PawnState.onPath ||
+          pawn.state == PawnState.onHomeStretch) {
+        if (pawn.step + diceResult == 56) {
+          moveScore += 2000;
+        }
+      }
+
+      // --- Deploy form base ---
+
+      if (pawn.state == PawnState.inBase &&
+          (diceResult == 6 /*add diceResult == 12 to open in 12*/ )) {
+        moveScore += 300;
+      }
+
+      // ---Path logic---
+      if (pawn.state == PawnState.onPath) {
+        int currentAbs = BoardCoordinates.getAbsolutePosition(pawn);
+        int nextStep = pawn.step + diceResult;
+
+        // entering the safe home stretch
+        if (pawn.step < 51 && nextStep >= 51) {
+          moveScore += 400;
+        } else if (nextStep < 51) {
+          int colorOffset = 0;
+          switch (pawn.color) {
+            case PlayerColor.green:
+              colorOffset = 0;
+              break;
+            case PlayerColor.blue:
+              colorOffset = 26;
+              break;
+            case PlayerColor.red:
+              colorOffset = 39;
+              break;
+            case PlayerColor.yellow:
+              colorOffset = 13;
+              break;
+          }
+          int nextAbs = (nextStep + colorOffset) % 52;
+
+          // --- Haunting ---
+
+          bool canCut = false;
+          if (!BoardCoordinates.safeZones.contains(nextAbs)) {
+            for (var player in players) {
+              if (player.color != pawn.color) {
+                for (var oppPawn in player.pawns) {
+                  if (oppPawn.state == PawnState.onPath &&
+                      !oppPawn.isShielded) {
+                    int oppAbs = BoardCoordinates.getAbsolutePosition(oppPawn);
+                    if (oppAbs == nextAbs) {
+                      canCut = true;
+                      moveScore += 1000 + (oppPawn.step * 10);
+                    }
+                  }
+                }
+              }
+            }
+          }
+          // ---- Escaping Danger ----
+          bool isVulnerable = false;
+          if (!BoardCoordinates.safeZones.contains(currentAbs)) {
+            for (var player in players) {
+              if (player.color != pawn.color) {
+                for (var oppPawn in player.pawns) {
+                  if (oppPawn.state == PawnState.onPath) {
+                    int oppAbs = BoardCoordinates.getAbsolutePosition(oppPawn);
+
+                    int diff = (currentAbs - oppAbs + 52) % 52;
+                    if (diff > 0 && diff <= 6) {
+                      isVulnerable = true;
+                    }
+                  }
+                }
+              }
+            }
+          }
+          // if we are in danger, move pawn or run
+          if (isVulnerable && !canCut) {
+            moveScore += 600;
+          }
+          // seeking for safe zones..
+          if (BoardCoordinates.safeZones.contains(nextAbs)) {
+            moveScore += 250;
+          }
+
+          // seeking for portals and powers..
+
+          if (activePortals.any((p) => p.a == nextAbs || p.b == nextAbs)) {
+            moveScore += 350;
+          }
+          if (activePower.any((p) => p.position == nextAbs)) {
+            moveScore += 450;
+          }
+        }
+      }
+
+      // GENERAL PROGRESS
+
+      if (pawn.state != PawnState.inBase) {
+        moveScore += pawn.step;
+      }
+      moveScore += random.nextInt(40);
+      // compare to find the best move
+      if (moveScore > highestScore) {
+        highestScore = moveScore;
+        bestPawn = pawn;
+      }
+    }
+    return bestPawn ?? validMoves.first;
   }
 
   /// Returns a list of pawns belonging to the current player that can legally move.
