@@ -83,7 +83,7 @@ class _VictoryOverlayState extends State<VictoryOverlay>
               child: Lottie.asset(
                 "assets/animations/triangle_reach.json",
                 repeat: true,
-                frameRate: const FrameRate(120),
+                frameRate: FrameRate.max,
               ),
             ),
           ),
@@ -94,7 +94,8 @@ class _VictoryOverlayState extends State<VictoryOverlay>
               child: Lottie.asset(
                 "assets/animations/victory_trophy.json",
                 repeat: false,
-                frameRate: const FrameRate(120),
+                frameRate: FrameRate.max,
+
                 animate: true,
               ),
             ),

@@ -216,23 +216,21 @@ class BoardCoordinates {
     if (pawn.state == PawnState.inBase) {
       // ─── Base Position ───
       gridPos = getBasePosition(pawn.color, pawn.id);
-
     } else if (pawn.state == PawnState.onHomeStretch) {
       // ─── Home Stretch Position ───
       // pawn.step is 51–55 → convert to 0–4 index into homeStretches list.
       // ADJUSTABLE: Change the home-stretch entry step offset here (currently 51).
       int homeIndex = (pawn.step - 51).clamp(0, 4);
       gridPos = homeStretches[pawn.color]![homeIndex];
-
     } else if (pawn.state == PawnState.finished) {
       // ─── Finished / Center Triangle Position ───
       // Pawns scatter in a 2×2 cluster so all 4 finished pawns are visible.
       // ADJUSTABLE: Change finish cluster scatter offsets here.
       final List<Offset> finishOffsets = [
-        const Offset(-0.2, -0.2), // id 0: top-left
-        const Offset(0.2, -0.2),  // id 1: top-right
-        const Offset(-0.2, 0.2),  // id 2: bottom-left
-        const Offset(0.2, 0.2),   // id 3: bottom-right
+        const Offset(-0.25, -0.25), // id 0: top-left
+        const Offset(0.25, -0.25), // id 1: top-right
+        const Offset(-0.25, 0.25), // id 2: bottom-left
+        const Offset(0.25, 0.25), // id 3: bottom-right
       ];
       final Offset scatter = finishOffsets[pawn.id];
 
@@ -251,7 +249,6 @@ class BoardCoordinates {
           gridPos = Offset(7.0 + scatter.dx, 7.8 + scatter.dy);
           break;
       }
-
     } else {
       // ─── Main Path Position ───
       // getAbsolutePosition wraps the relative step to a 0–51 ring index.

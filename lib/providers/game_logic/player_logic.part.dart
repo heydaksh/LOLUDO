@@ -31,6 +31,7 @@ extension GameProviderPlayer on GameProvider {
 
     currentTurn = players.first.color;
     isPaused = false;
+    _startTurnTimer();
     refresh();
   }
 
@@ -68,10 +69,15 @@ extension GameProviderPlayer on GameProvider {
       _initializeGame();
     }
 
+    _startTurnTimer();
     refresh();
   }
 
   void removePlayer(PlayerColor color) {
+    if (isOnlineMultiplayer && currentOnlineRoomId != null) {
+      _db.child('rooms/$currentOnlineRoomId/players/${color.name}').remove();
+    }
+
     if (currentTurn == color) {
       nextTurn();
     }
@@ -117,7 +123,7 @@ extension GameProviderPlayer on GameProvider {
 
     if (activePlayer.hasWon && !winner.contains(color)) {
       debugPrint(' [WINNER] ${color.name.toUpperCase()} HAS WON THE GAME!');
-      AudioManager.playGameWin();
+      // AudioManager.playGameWin(); removed as per request
       winner.add(color);
     }
     if (winner.length >= players.length - 1) {

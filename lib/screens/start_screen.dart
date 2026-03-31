@@ -18,6 +18,24 @@ class StartScreen extends StatefulWidget {
 
 class _StartScreenState extends State<StartScreen> {
   @override
+  void initState() {
+    super.initState();
+    rootBundle.loadString('assets/animations/triangle_reach.json');
+    rootBundle.loadString('assets/animations/victory_trophy.json');
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    precacheImage(const AssetImage("assets/images/bg_image.webp"), context);
+    precacheImage(const AssetImage("assets/images/start_game.webp"), context);
+    precacheImage(
+      const AssetImage("assets/images/player_select.webp"),
+      context,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
 

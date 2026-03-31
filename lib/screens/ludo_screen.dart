@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lottie/lottie.dart';
@@ -69,6 +67,8 @@ class LudoScreen extends StatelessWidget {
       (p) => p.myLocalColor,
     );
 
+    final viewColor = myColor ?? PlayerColor.green;
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, Object? result) {
@@ -95,7 +95,7 @@ class LudoScreen extends StatelessWidget {
                 // ADJUSTABLE: Change dice slide animation speed here (currently 450 ms).
                 duration: AppConfig.standardUiAnimationDuration,
                 curve: Curves.easeInOutCubic,
-                alignment: _getDiceAlignment(currentTurn),
+                alignment: _getDiceAlignment(currentTurn, viewColor),
                 child: const Padding(
                   // ADJUSTABLE: Change dice padding from screen edge here (currently 10 px).
                   padding: EdgeInsets.all(10),
@@ -106,8 +106,8 @@ class LudoScreen extends StatelessWidget {
 
             // ─── 3.5 ACTIVE POWERS / CHEATS INDICATOR ───
             Positioned(
-              bottom: 80, // Placed right above the Settings Menu
-              left: 15,
+              bottom: 8,
+              right: 10,
               child: Consumer<GameProvider>(
                 builder: (context, provider, child) {
                   List<String> activeCheats = [];
@@ -124,8 +124,8 @@ class LudoScreen extends StatelessWidget {
 
                   return Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
+                      horizontal: 8,
+                      vertical: 6,
                     ),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.75),
@@ -215,7 +215,7 @@ class LudoScreen extends StatelessWidget {
               );
               return SafeArea(
                 child: AnimatedAlign(
-                  alignment: _getPowerAlignment(player.color),
+                  alignment: _getPowerAlignment(player.color, viewColor),
                   duration: AppConfig.standardUiAnimationDuration,
                   child: Padding(
                     padding: const EdgeInsets.all(10.0),
@@ -281,29 +281,43 @@ class LudoScreen extends StatelessWidget {
   ///   Yellow → top-right    ( 1, -0.85)
   ///   Blue   → bottom-right ( 1,  0.7)
   ///   Red    → bottom-left  (-1,  0.7)
-  Alignment _getDiceAlignment(PlayerColor turn) {
-    switch (turn) {
-      case PlayerColor.green:
-        return const Alignment(-1, -0.85);
-      case PlayerColor.yellow:
-        return const Alignment(1, -0.85);
-      case PlayerColor.blue:
-        return const Alignment(1, 0.7);
-      case PlayerColor.red:
+  Alignment _getDiceAlignment(PlayerColor turn, PlayerColor viewColor) {
+    int viewIndex = PlayerColor.values.indexOf(viewColor);
+    int turnIndex = PlayerColor.values.indexOf(
+      turn,
+    ); // Fixed typo from turnIndaex too!
+    int relativeTurn = (turnIndex - viewIndex + 4) % 4;
+
+    switch (relativeTurn) {
+      case 0:
+        return const Alignment(-1, 0.7); // Bottom-Left (Viewer)
+      case 1:
+        return const Alignment(-1, -0.85); // Top-Left (Next Player)
+      case 2: // ✅ FIXED: Added missing case 2
+        return const Alignment(1, -0.85); // Top-Right (Opposite)
+      case 3: // ✅ FIXED: Changed from 4 to 3
+        return const Alignment(1, 0.7); // Bottom-Right (Previous Player)
+      default:
         return const Alignment(-1, 0.7);
     }
   }
 
-  Alignment _getPowerAlignment(PlayerColor turn) {
-    switch (turn) {
-      case PlayerColor.green:
-        return const Alignment(-1, -0.65); // Below green dice
-      case PlayerColor.yellow:
-        return const Alignment(1, -0.65); // Below yellow dice
-      case PlayerColor.blue:
-        return const Alignment(1, 0.90); // Below blue dice
-      case PlayerColor.red:
-        return const Alignment(-1, 0.90); // Below red dice
+  Alignment _getPowerAlignment(PlayerColor turn, PlayerColor viewColor) {
+    int viewIndex = PlayerColor.values.indexOf(viewColor);
+    int turnIndex = PlayerColor.values.indexOf(turn);
+    int relativeTurn = (turnIndex - viewIndex + 4) % 4;
+
+    switch (relativeTurn) {
+      case 0:
+        return const Alignment(-1, 0.90); // Below Bottom-Left
+      case 1:
+        return const Alignment(-1, -0.65); // Below Top-Left
+      case 2:
+        return const Alignment(1, -0.65); // Below Top-Right
+      case 3:
+        return const Alignment(1, 0.90); // Below Bottom-Right
+      default:
+        return const Alignment(-1, 0.90);
     }
   }
 }
@@ -413,7 +427,7 @@ class _PauseOverlay extends StatelessWidget {
                     );
                   },
                   child: Text(
-                    'Quit Game',
+                    'End Game',
                     style: TextStyle(
                       color: Colors.red,
                       fontSize: size.width / 26,

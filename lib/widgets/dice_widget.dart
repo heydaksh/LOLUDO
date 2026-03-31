@@ -68,7 +68,7 @@ class _DiceWidgetState extends State<DiceWidget> with TickerProviderStateMixin {
   // Creates authentic Ludo dice dots instead of text/icons
   // Creates authentic Ludo dice dots instead of text/icons
   Widget _buildDiceDots(int value, Color color, double size) {
-    final double dotSize = size / 5.0; // Adjusted dot size
+    final double dotSize = size / 5.5; // Adjusted dot size
 
     Widget dot() => Container(
       width: dotSize,
@@ -82,7 +82,7 @@ class _DiceWidgetState extends State<DiceWidget> with TickerProviderStateMixin {
       width: size,
       height: size,
       child: Padding(
-        padding: EdgeInsets.all(size / 5.5),
+        padding: EdgeInsets.all(size / 5.9),
         child: Stack(
           children: [
             if (value > 1) Align(alignment: Alignment.topRight, child: dot()),

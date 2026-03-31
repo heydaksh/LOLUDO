@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:ludo_game/utils/app_config.dart';
 import 'package:ludo_game/models/powers.dart';
+import 'package:ludo_game/utils/app_config.dart';
 
 /// ==============================
 /// POWER WIDGET
@@ -13,10 +13,7 @@ import 'package:ludo_game/models/powers.dart';
 class PowerWidget extends StatefulWidget {
   final PowerType type;
 
-  const PowerWidget({
-    super.key,
-    required this.type,
-  });
+  const PowerWidget({super.key, required this.type});
 
   @override
   State<PowerWidget> createState() => _PowerWidgetState();
@@ -36,9 +33,10 @@ class _PowerWidgetState extends State<PowerWidget>
       duration: AppConfig.powerWidgetDuration,
     )..repeat(reverse: true);
 
-    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _pulseAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.2,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -120,9 +118,7 @@ class _PowerWidgetState extends State<PowerWidget>
                   style: BorderStyle.solid,
                 ),
               ),
-              child: CustomPaint(
-                painter: _PowerRingPainter(color: color),
-              ),
+              child: CustomPaint(painter: _PowerRingPainter(color: color)),
             ),
           ),
           // Icon Core
@@ -133,11 +129,7 @@ class _PowerWidgetState extends State<PowerWidget>
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white, width: 1.5),
             ),
-            child: Icon(
-              icon,
-              color: Colors.white,
-              size: 14,
-            ),
+            child: Icon(icon, color: Colors.white, size: 14),
           ),
         ],
       ),

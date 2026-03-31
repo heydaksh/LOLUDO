@@ -89,6 +89,16 @@ extension GameProviderMovement on GameProvider {
         bool cutOpponent = false;
         bool isReversing = useReverseMode && pawn.hasReverse;
 
+        if (isReversing) {
+          pawn.hasReverse = false;
+          useReverseMode = false;
+          showPowerToast(
+            '⏪ ${pawn.color.name.toUpperCase()} used Reverse Move!',
+            Colors.purple.shade700,
+            Icons.fast_rewind,
+          );
+        }
+
         for (int i = 0; i < stepToTake; i++) {
           if (isReversing) {
             if (pawn.step > 0) pawn.step--;
@@ -109,25 +119,37 @@ extension GameProviderMovement on GameProvider {
           if (pawn.step == 56) {
             pawn.isWinningAnimation = true;
             AudioManager.playTriangleReach();
+            
+            // Start the 2.5s timer immediately so timing matches perfectly
+            Future.delayed(const Duration(milliseconds: 2500), () {
+              pawn.isWinningAnimation = false;
+              refresh();
+            });
+            
             refresh();
-            await Future.delayed(AppConfig.postMoveDelay);
+            // Sync appropriately while state is STILL onHomeStretch!
+            // This ensures remote clients shrink the pawn at the entry cell.
+            syncPawnState(pawn);
+
+            // Wait specifically for the shrink (black hole) animation to complete
+            await Future.delayed(AppConfig.pawnFinishAnimationDuration);
 
             if (isGameOver || pawn.state == PawnState.inBase) {
-              debugPrint(
-                '[ANIMATION ABORTED] Game reset during win animation.',
-              );
+              debugPrint('[ANIMATION ABORTED] Game reset during win animation.');
               return;
             }
 
+            // Put it visually inside the triangle but it remains invisible
             pawn.state = PawnState.finished;
+            refresh();
+            syncPawnState(pawn);
           } else {
             AudioManager.playPawnMovement();
+            refresh();
+            syncPawnState(pawn);
+            // Add pause between normal steps
+            await Future.delayed(AppConfig.captureExecutionDelay);
           }
-
-          refresh();
-          syncPawnState(pawn);
-          // Add small pause before checking capture
-          await Future.delayed(AppConfig.captureExecutionDelay);
 
           if (isGameOver || pawn.state == PawnState.inBase) {
             debugPrint(
@@ -143,18 +165,10 @@ extension GameProviderMovement on GameProvider {
             );
             if (intermediateCut) cutOpponent = true;
           }
+          
           if (pawn.step == 56) {
             _checkWinCondition(pawn.color);
-            Future.delayed(const Duration(milliseconds: 2500), () {
-              pawn.isWinningAnimation = false;
-              refresh();
-            });
           }
-        }
-
-        if (isReversing) {
-          pawn.hasReverse = false;
-          useReverseMode = false;
         }
 
         if (!isBulldozerMode || diceResult != 5) {

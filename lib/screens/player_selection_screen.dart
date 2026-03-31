@@ -292,21 +292,13 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
                           Align(
                             alignment: Alignment.topLeft,
                             child: _playerBase(
-                              Colors.green,
-                              selectedPlayers[0],
-                              0,
-                            ),
-                          ),
-                          Align(
-                            alignment: Alignment.topRight,
-                            child: _playerBase(
                               Colors.yellow,
                               selectedPlayers[1],
                               1,
                             ),
                           ),
                           Align(
-                            alignment: Alignment.bottomRight,
+                            alignment: Alignment.topRight,
                             child: _playerBase(
                               Colors.blue,
                               selectedPlayers[2],
@@ -314,11 +306,19 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
                             ),
                           ),
                           Align(
-                            alignment: Alignment.bottomLeft,
+                            alignment: Alignment.bottomRight,
                             child: _playerBase(
                               Colors.red,
                               selectedPlayers[3],
                               3,
+                            ),
+                          ),
+                          Align(
+                            alignment: Alignment.bottomLeft,
+                            child: _playerBase(
+                              Colors.green,
+                              selectedPlayers[0],
+                              0,
                             ),
                           ),
                         ],

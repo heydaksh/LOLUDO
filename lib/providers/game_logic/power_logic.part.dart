@@ -33,10 +33,17 @@ extension GameProviderPower on GameProvider {
   }
 
   Future<void> _applyPower(Pawn pawn, PowerType type) async {
+    String colorName = pawn.color.name.toUpperCase();
+
     switch (type) {
       case PowerType.shield:
         pawn.shieldTurn = 1;
         syncPawnState(pawn);
+        showPowerToast(
+          '🛡️ $colorName token is Shielded for 1 turn!',
+          Colors.cyan.shade700,
+          Icons.shield,
+        );
         debugPrint(
           '🛡️ [SHIELD] Shield activated for ${pawn.color.name} pawn!',
         );
@@ -45,6 +52,11 @@ extension GameProviderPower on GameProvider {
       case PowerType.reverse:
         pawn.hasReverse = true;
         syncPawnState(pawn);
+        showPowerToast(
+          '🔄 $colorName got Reverse Power!',
+          Colors.purple.shade700,
+          Icons.u_turn_left,
+        );
         debugPrint(
           '🔄 [REVERSE] Reverse activated for ${pawn.color.name} pawn!',
         );
@@ -52,6 +64,11 @@ extension GameProviderPower on GameProvider {
 
       case PowerType.multiplier:
         players.firstWhere((p) => p.color == pawn.color).hasMultiplier = true;
+        showPowerToast(
+          '✖️ $colorName\'s next dice roll is Doubled!',
+          Colors.amber.shade700,
+          Icons.star,
+        );
         debugPrint(
           '✖️ [MULTIPLIER] Multiplier activated for ${pawn.color.name} pawn!',
         );
@@ -89,6 +106,11 @@ extension GameProviderPower on GameProvider {
           target.step = getRelative(myAbs, target.color);
           syncPawnState(pawn);
           syncPawnState(target);
+          showPowerToast(
+            '🌀 $colorName Swapped positions with ${target.color.name.toUpperCase()}!',
+            Colors.green.shade700,
+            Icons.swap_calls,
+          );
           debugPrint('🔄 [SWAP] Swapped with ${target.color.name} pawn!');
         } else {
           debugPrint(

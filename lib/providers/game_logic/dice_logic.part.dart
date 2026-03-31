@@ -19,7 +19,7 @@ extension GameProviderDice on GameProvider {
       Player activePlayer = players.firstWhere((p) => p.color == currentTurn);
 
       if (alwaysRollSix) {
-        diceResult = 6;
+        diceResult = 6; // change dice value here
       } else {
         if (activePlayer.turnsWithoutSix >= 7) {
           diceResult = 6;

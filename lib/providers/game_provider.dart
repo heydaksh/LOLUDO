@@ -220,10 +220,23 @@ class GameProvider extends ChangeNotifier {
     Player upcomingPlayer = players.firstWhere((p) => p.color == currentTurn);
     for (var pawn in upcomingPlayer.pawns) {
       if (pawn.shieldTurn > 0) pawn.shieldTurn--;
+
+      if (pawn.shieldTurn == 0) {
+        showPowerToast(
+          '⚠️ ${pawn.color.name.toUpperCase()}\'s Shield Expired!',
+          Colors.orange.shade800,
+          Icons.gpp_bad,
+        );
+      }
+
+      if (isOnlineMultiplayer && isHost) {
+        syncPawnState(pawn);
+      }
     }
 
     notifyListeners();
     syncTurnChange();
+    _startTurnTimer(); // start turn timer for offline play
     triggerBotTurn();
   }
 
@@ -517,7 +530,18 @@ class GameProvider extends ChangeNotifier {
             (p) => p.color == currentTurn,
           );
           for (var pawn in upcomingPlayer.pawns) {
-            if (pawn.shieldTurn > 0) pawn.shieldTurn--;
+            if (pawn.shieldTurn > 0) {
+              pawn.shieldTurn--;
+
+              if (pawn.shieldTurn == 0) {
+                showPowerToast(
+                  '⚠️ ${pawn.color.name.toUpperCase()}\'s Shield Expired!',
+                  Colors.orange.shade800,
+                  Icons.gpp_bad,
+                );
+              }
+              if (isHost) syncPawnState(pawn);
+            }
           }
 
           // [FIXED]: Trigger the bot remotely if the turn switched to a bot
@@ -595,9 +619,10 @@ class GameProvider extends ChangeNotifier {
               // These only trigger if the state actually changed, meaning this
               // local client didn't make the move (otherwise state would already match).
 
-              // 1. Triangle Reach (Finished)
-              if (pawn.state != PawnState.finished &&
-                  newState == PawnState.finished) {
+              // 1. Triangle Reach (Winning Animation Trigger)
+              // Trigger when it hits step 56, BEFORE it reaches 'finished' state.
+              // This allows the pawn to shrink (black hole effect) precisely at the track tip.
+              if (pawn.step != 56 && newStep == 56) {
                 pawn.isWinningAnimation = true;
                 AudioManager.playTriangleReach();
 
@@ -686,9 +711,6 @@ class GameProvider extends ChangeNotifier {
           if (pData != null) {
             p.name = pData['name'];
             bool isPlayerOnline = pData['isOnline'] == true;
-            if (!isPlayerOnline && !removedPlayers.contains(p.color)) {
-              removePlayer(p.color);
-            }
           } else {
             // If they are missing from Firebase while the game is playing,
             // it means the host kicked them mid-game. We must remove them!
@@ -778,20 +800,24 @@ class GameProvider extends ChangeNotifier {
 
   void _startTurnTimer() {
     // Only the host manages the authoritative turn timer to avoid race conditions.
-    if (!isOnlineMultiplayer || !isHost) return;
+    if (isOnlineMultiplayer && !isHost) return;
 
     _turnTimer?.cancel();
 
-    _turnTimer = Timer(const Duration(seconds: 10), () async {
+    _turnTimer = Timer(const Duration(seconds: 15), () async {
       debugPrint("Time out for ${currentTurn.name}! Skipping Turn..");
 
-      // Find the next available color using our centralized helper.
-      PlayerColor nextColor = _getNextActiveColor(currentTurn);
+      if (isOnlineMultiplayer) {
+        // Find the next available color using our centralized helper.
+        PlayerColor nextColor = _getNextActiveColor(currentTurn);
 
-      await _db.child('rooms/$currentOnlineRoomId').update({
-        'currentTurn': nextColor.name,
-        'hasRolled': false,
-      });
+        await _db.child('rooms/$currentOnlineRoomId').update({
+          'currentTurn': nextColor.name,
+          'hasRolled': false,
+        });
+      } else {
+        nextTurn();
+      }
     });
   }
 
@@ -853,6 +879,41 @@ class GameProvider extends ChangeNotifier {
   }
 
   void refresh() => notifyListeners();
+
+  // ==============================
+  // TOAST NOTIFICATION HELPER
+  // ==============================
+  void showPowerToast(String message, Color bgColor, IconData icon) {
+    // Hide any existing toast instantly so they don't queue up forever
+    scaffoldMessengerKey.currentState?.hideCurrentSnackBar();
+
+    scaffoldMessengerKey.currentState?.showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(icon, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: bgColor,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        margin: const EdgeInsets.only(bottom: 20, left: 20, right: 20),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 6,
+      ),
+    );
+  }
 
   /// Centrally determine if a color is part of the current game session.
   bool isPlayerInGame(PlayerColor color) {

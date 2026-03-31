@@ -43,7 +43,7 @@ class AppConfig {
   static const Duration pawnSlideDuration = Duration(milliseconds: 200);
 
   /// Speed of the vertical jump arc in a single step of a pawn's movement.
-  static const Duration pawnJumpDuration = Duration(milliseconds: 100);
+  static const Duration pawnJumpDuration = Duration(milliseconds: 200);
 
   // ==============================
   // BOT & AUTOMATION TIMINGS
