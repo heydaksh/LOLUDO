@@ -222,11 +222,11 @@ class GameProvider extends ChangeNotifier {
       if (pawn.shieldTurn > 0) pawn.shieldTurn--;
 
       if (pawn.shieldTurn == 0) {
-        showPowerToast(
-          '⚠️ ${pawn.color.name.toUpperCase()}\'s Shield Expired!',
-          Colors.orange.shade800,
-          Icons.gpp_bad,
-        );
+        // showPowerToast(
+        //   '⚠️ ${pawn.color.name.toUpperCase()}\'s Shield Expired!',
+        //   Colors.orange.shade800,
+        //   Icons.gpp_bad,
+        // );
       }
 
       if (isOnlineMultiplayer && isHost) {

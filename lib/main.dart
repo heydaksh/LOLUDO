@@ -47,7 +47,7 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'Flutter Ludo',
-        key: scaffoldMessengerKey,
+        scaffoldMessengerKey: scaffoldMessengerKey,
         theme: ThemeData(
           colorScheme: ColorScheme.dark(primary: Colors.red),
           useMaterial3: true,

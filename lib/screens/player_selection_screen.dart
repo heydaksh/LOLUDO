@@ -405,7 +405,11 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
                 child: Text(
                   'Creator',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white, fontSize: 10),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: .bold,
+                  ),
                 ),
               ),
             ),
