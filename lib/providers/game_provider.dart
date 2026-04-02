@@ -505,7 +505,13 @@ class GameProvider extends ChangeNotifier {
     _roomSubscription = _db.child('rooms/$currentOnlineRoomId').onValue.listen((
       event,
     ) {
-      if (event.snapshot.value == null) return;
+      if (event.snapshot.value == null) {
+        if (isOnlineMultiplayer && !isHost) {
+          roomStatus = 'ended_by_host';
+          refresh();
+        }
+        return;
+      }
 
       Map roomData = event.snapshot.value as Map;
 
@@ -825,8 +831,7 @@ class GameProvider extends ChangeNotifier {
   // FIREBASE SYNC HELPERS
   // ---------------------------------------------------
 
-  ///  Dice ko Firebase par sync karne ke liye
-  ///  Dice ko Firebase par sync karne ke liye
+  ///  To sync the dice roll to Firebase.
   Future<void> syncDiceRoll(int newDiceResult) async {
     if (!isOnlineMultiplayer || currentOnlineRoomId == null) return;
 
@@ -844,11 +849,11 @@ class GameProvider extends ChangeNotifier {
 
     await _db.child('rooms/$currentOnlineRoomId').update({
       'isDiceRolling': rolling,
-      'diceResult': diceResult, // Add this line!
+      'diceResult': diceResult,
     });
   }
 
-  /// Pawn ki nayi position Firebase par bhejne ke liye
+  /// To send the new position of player to firebase.
   Future<void> syncPawnState(Pawn pawn) async {
     if (!isOnlineMultiplayer || currentOnlineRoomId == null) return;
 
@@ -861,7 +866,7 @@ class GameProvider extends ChangeNotifier {
     });
   }
 
-  ///  Jab turn change ho (e.g. Green to Yellow), usey sync karne ke liye
+  ///  To sync the turn change (e.g. Green to Yellow).
   Future<void> syncTurnChange() async {
     if (!isOnlineMultiplayer || currentOnlineRoomId == null) return;
 

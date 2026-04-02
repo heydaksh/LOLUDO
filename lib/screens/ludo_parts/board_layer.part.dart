@@ -500,7 +500,7 @@ class _PlayerNameLabel extends StatelessWidget {
     final double cell = boardSize.width / 15;
 
     // 🔥 Position exactly in the middle of the 1-cell thick outer colored border
-    final double edge = cell * 0.5;
+    final double edge = cell * 0.7;
 
     // Centers of the 6x6 bases
     final double base1Center = cell * 3;
@@ -539,7 +539,7 @@ class _PlayerNameLabel extends StatelessWidget {
     return Positioned(
       left: x,
       top: y,
-      // 🔥 FractionalTranslation beautifully shifts the text so its dead-center
+      //  FractionalTranslation beautifully shifts the text so its dead-center
       // sits exactly on our calculated X and Y points!
       child: FractionalTranslation(
         translation: const Offset(-0.5, -0.5),
@@ -553,7 +553,7 @@ class _PlayerNameLabel extends StatelessWidget {
             ),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.9),
-              borderRadius: BorderRadius.circular(boardSize.width * 0.01),
+              borderRadius: BorderRadius.circular(boardSize.width * 0.02),
               border: Border.all(
                 color: Colors.black54,
                 width: boardSize.width * 0.003,

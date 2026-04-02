@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:lottie/lottie.dart';
+import 'package:ludo_game/main.dart';
 import 'package:ludo_game/models/game_models.dart';
 import 'package:ludo_game/models/portals.dart';
 import 'package:ludo_game/models/powers.dart';
@@ -66,8 +68,36 @@ class LudoScreen extends StatelessWidget {
     final myColor = context.select<GameProvider, PlayerColor?>(
       (p) => p.myLocalColor,
     );
+    final roomStatus = context.select<GameProvider, String>(
+      (p) => p.roomStatus,
+    );
 
     final viewColor = myColor ?? PlayerColor.green;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
+      if (roomStatus == 'ended_by_host') {
+        scaffoldMessengerKey.currentState?.showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Game ended by host",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        context.read<GameProvider>().exitGame();
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const StartScreen()),
+          (route) => false,
+        );
+      }
+    });
 
     return PopScope(
       canPop: false,
@@ -419,7 +449,15 @@ class _PauseOverlay extends StatelessWidget {
                 const SizedBox(height: 20),
                 TextButton(
                   onPressed: () {
-                    provider.exitGame();
+                    if (provider.isHost) {
+                      provider.endGameHost();
+                    } else if (provider.isOnlineMultiplayer &&
+                        provider.myLocalColor != null) {
+                      provider.removePlayer(provider.myLocalColor!);
+                      provider.exitGame();
+                    } else {
+                      provider.exitGame();
+                    }
                     Navigator.pushAndRemoveUntil(
                       context,
                       MaterialPageRoute(builder: (_) => const StartScreen()),
@@ -427,7 +465,7 @@ class _PauseOverlay extends StatelessWidget {
                     );
                   },
                   child: Text(
-                    'End Game',
+                    provider.isHost ? 'End Game' : 'Exit Game',
                     style: TextStyle(
                       color: Colors.red,
                       fontSize: size.width / 26,

@@ -217,7 +217,12 @@ class _VictoryOverlayState extends State<VictoryOverlay>
                       /// EXIT BUTTON
                       ElevatedButton(
                         onPressed: () {
-                          context.read<GameProvider>().exitGame();
+                          final provider = context.read<GameProvider>();
+                          if (provider.isOnlineMultiplayer &&
+                              provider.myLocalColor != null) {
+                            provider.removePlayer(provider.myLocalColor!);
+                          }
+                          provider.exitGame();
                           Navigator.pushAndRemoveUntil(
                             context,
                             MaterialPageRoute(

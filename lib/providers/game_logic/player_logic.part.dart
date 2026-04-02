@@ -123,13 +123,20 @@ extension GameProviderPlayer on GameProvider {
 
     if (activePlayer.hasWon && !winner.contains(color)) {
       debugPrint(' [WINNER] ${color.name.toUpperCase()} HAS WON THE GAME!');
-      // AudioManager.playGameWin(); removed as per request
       winner.add(color);
     }
     if (winner.length >= players.length - 1) {
       isGameOver = true;
       debugPrint('[GAME OVER] ALL PLAYERS HAVE WON THE GAME!');
     }
+  }
+
+  Future<void> endGameHost() async {
+    if (isOnlineMultiplayer && isHost && currentOnlineRoomId != null) {
+      await _db.child('rooms/$currentOnlineRoomId').remove();
+      currentOnlineRoomId = null;
+    }
+    exitGame();
   }
 
   void exitGame() {
@@ -143,9 +150,11 @@ extension GameProviderPlayer on GameProvider {
       if (isHost && roomStatus == 'waiting') {
         _db.child('rooms/$currentOnlineRoomId').remove();
       } else {
-        _db
-            .child('rooms/$currentOnlineRoomId/players/${myLocalColor!.name}')
-            .update({'isOnline': false});
+        if (!removedPlayers.contains(myLocalColor)) {
+          _db
+              .child('rooms/$currentOnlineRoomId/players/${myLocalColor!.name}')
+              .update({'isOnline': false});
+        }
       }
     }
 

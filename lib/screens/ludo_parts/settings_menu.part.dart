@@ -168,6 +168,24 @@ class _SettingsMenu extends StatelessWidget {
                         ),
                       ),
 
+                      // END GAME (HOST ONLY)
+                      if (gameProvider.isHost)
+                        PopupMenuItem(
+                          value: 'EndGame',
+                          child: Row(
+                            children: [
+                              Text(
+                                "End Game",
+                                style: TextStyle(
+                                  color: Colors.redAccent,
+                                  fontSize: size.width / 28,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
                       /// EXIT
                       PopupMenuItem(
                         value: 'Exit',
@@ -258,6 +276,107 @@ class _SettingsMenu extends StatelessWidget {
                       } else if (value == 'PassTurn') {
                         HapticFeedback.mediumImpact();
                         gameProvider.nextTurn();
+                      } else if (value == 'EndGame') {
+                        HapticFeedback.mediumImpact();
+                        showDialog(
+                          context: context,
+                          builder: (_) {
+                            return Dialog(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  size.width / 18,
+                                ),
+                              ),
+                              child: Container(
+                                padding: EdgeInsets.all(size.width / 18),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade900,
+                                  borderRadius: BorderRadius.circular(
+                                    size.width / 18,
+                                  ),
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    /// TITLE
+                                    Text(
+                                      "End Game",
+                                      style: TextStyle(
+                                        fontSize: size.width / 20,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    SizedBox(height: size.height / 80),
+
+                                    /// MESSAGE
+                                    Text(
+                                      "Are you sure you want to end the game for everyone?",
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: size.width / 28,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    SizedBox(height: size.height / 40),
+
+                                    /// BUTTONS
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceEvenly,
+                                      children: [
+                                        /// CANCEL
+                                        ElevatedButton(
+                                          onPressed: () {
+                                            Navigator.pop(context);
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.grey,
+                                          ),
+                                          child: Text(
+                                            "Cancel",
+                                            style: TextStyle(
+                                              fontSize: size.width / 28,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+
+                                        /// END GAME
+                                        ElevatedButton(
+                                          onPressed: () async {
+                                            Navigator.pop(context);
+                                            context
+                                                .read<GameProvider>()
+                                                .endGameHost();
+                                            Navigator.pushAndRemoveUntil(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) =>
+                                                    const StartScreen(),
+                                              ),
+                                              (route) => false,
+                                            );
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.redAccent,
+                                          ),
+                                          child: Text(
+                                            "End Game",
+                                            style: TextStyle(
+                                              fontSize: size.width / 28,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        );
                       } else if (value == 'Exit') {
                         showDialog(
                           context: context,
@@ -345,10 +464,15 @@ class _SettingsMenu extends StatelessWidget {
                                             Navigator.pop(
                                               context,
                                             ); // Close dialog
-                                            // Kill all active game states and bot functions
-                                            context
-                                                .read<GameProvider>()
-                                                .exitGame();
+                                            final provider = context
+                                                .read<GameProvider>();
+                                            if (provider.isOnlineMultiplayer &&
+                                                provider.myLocalColor != null) {
+                                              provider.removePlayer(
+                                                provider.myLocalColor!,
+                                              );
+                                            }
+                                            provider.exitGame();
                                             // Erase the whole route history and return to Start
                                             Navigator.pushAndRemoveUntil(
                                               context,
