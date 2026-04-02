@@ -71,7 +71,7 @@ class _StartScreenState extends State<StartScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                /// 🔥 BUTTONS CENTER
+                ///  BUTTONS CENTER
                 Column(
                   children: [
                     _glassButton(
@@ -122,7 +122,7 @@ class _StartScreenState extends State<StartScreen> {
                   ],
                 ),
 
-                /// 🔥 BOTTOM ACTIONS
+                ///  BOTTOM ACTIONS
                 Padding(
                   padding: EdgeInsets.only(
                     bottom: size.height / 50,
@@ -169,7 +169,7 @@ class _StartScreenState extends State<StartScreen> {
     );
   }
 
-  /// 🔥 PREMIUM BUTTON
+  ///  PREMIUM BUTTON
   Widget _glassButton(
     BuildContext context, {
     required String text,
@@ -191,7 +191,7 @@ class _StartScreenState extends State<StartScreen> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(size.width / 12),
 
-              /// 🔥 BASE GLASS LAYER
+              ///  BASE GLASS LAYER
               gradient: LinearGradient(
                 colors: [
                   Colors.white.withValues(alpha: 0.15),
@@ -201,13 +201,13 @@ class _StartScreenState extends State<StartScreen> {
                 end: Alignment.bottomRight,
               ),
 
-              /// 🔥 GLASS BORDER
+              ///  GLASS BORDER
               border: Border.all(
                 color: Colors.white.withValues(alpha: 0.25),
                 width: size.width / 300,
               ),
 
-              /// 🔥 OUTER GLOW (COLOR)
+              ///  OUTER GLOW (COLOR)
               boxShadow: [
                 BoxShadow(
                   color: colors.first.withValues(alpha: 0.35),
@@ -219,7 +219,7 @@ class _StartScreenState extends State<StartScreen> {
 
             child: Stack(
               children: [
-                /// 🔥 COLOR INFUSION LAYER (main visual)
+                ///  COLOR INFUSION LAYER (main visual)
                 Positioned.fill(
                   child: Container(
                     decoration: BoxDecoration(
@@ -236,7 +236,7 @@ class _StartScreenState extends State<StartScreen> {
                   ),
                 ),
 
-                /// 🔥 LIGHT HIGHLIGHT (top shine)
+                ///  LIGHT HIGHLIGHT (top shine)
                 Positioned(
                   top: 0,
                   left: 0,
@@ -257,7 +257,7 @@ class _StartScreenState extends State<StartScreen> {
                   ),
                 ),
 
-                /// 🔥 INNER SHADOW (depth)
+                /// INNER SHADOW (depth)
                 Positioned.fill(
                   child: Container(
                     decoration: BoxDecoration(
@@ -273,7 +273,7 @@ class _StartScreenState extends State<StartScreen> {
                   ),
                 ),
 
-                /// 🔥 CONTENT
+                ///  CONTENT
                 Center(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,

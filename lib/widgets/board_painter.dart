@@ -34,7 +34,7 @@ class LudoBoardPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     // Derive cell size from canvas width. The board is 15×15 cells.
-    // ADJUSTABLE: Change board grid column/row count here (currently 15).
+    // Change board grid column/row count here (currently 15).
     final double cellSize = size.width / 15;
 
     final Paint fillPaint = Paint()..style = PaintingStyle.fill;
@@ -45,7 +45,7 @@ class LudoBoardPainter extends CustomPainter {
     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), fillPaint);
 
     // Stroke paint used throughout for cell outlines and borders.
-    // ADJUSTABLE: Change board outline color and thickness here.
+    // Change board outline color and thickness here.
     final Paint strokePaint = Paint()
       ..style = PaintingStyle.stroke
       ..color = Colors.black
@@ -158,7 +158,7 @@ class LudoBoardPainter extends CustomPainter {
           canvas,
           offset.dx * cellSize + (cellSize / 2), // center X of the cell
           offset.dy * cellSize + (cellSize / 2), // center Y of the cell
-          // ADJUSTABLE: Change star radius relative to cell here (currently cellSize * 0.35).
+          //  Change star radius relative to cell here (currently cellSize * 0.35).
           cellSize * 0.35,
           fill,
         );
@@ -184,9 +184,9 @@ class LudoBoardPainter extends CustomPainter {
     Paint paint,
   ) {
     Path path = Path();
-    // ADJUSTABLE: Change number of star points here (currently 6).
+    //  Change number of star points here (currently 6).
     int points = 6;
-    // ADJUSTABLE: Change inner radius ratio here (currently radius / 2).
+    //  Change inner radius ratio here (currently radius / 2).
     double innerRadius = radius / 2;
     double rotation = -math.pi / 2; // Start angle: pointing straight up.
     double step = math.pi / points; // Angle between each vertex.
@@ -275,7 +275,7 @@ class LudoBoardPainter extends CustomPainter {
     Paint stroke,
   ) {
     // ─── Outer Colored Box ───
-    // ADJUSTABLE: Change base size here relative to cell count (currently 6×6 cells).
+    //  Change base size here relative to cell count (currently 6×6 cells).
     fill.color = color;
     Rect baseRect = Rect.fromLTWH(x, y, cellSize * 6, cellSize * 6);
     canvas.drawRect(baseRect, fill);
@@ -283,7 +283,7 @@ class LudoBoardPainter extends CustomPainter {
 
     // ─── Inner White Box ───
     // Inset 1 cell on each edge, giving a colored border around the white interior.
-    // ADJUSTABLE: Change inner white box inset here (currently 1 cell = cellSize * 1).
+    // Change inner white box inset here (currently 1 cell = cellSize * 1).
     fill.color = Colors.white;
     Rect innerRect = Rect.fromLTWH(
       x + cellSize,
@@ -363,17 +363,17 @@ class LudoBoardPainter extends CustomPainter {
   void _drawHomePawnSlots(Canvas canvas, Size size) {
     final double cell = size.width / 15;
 
-    // ADJUSTABLE: Change home slot pawn-slot circle size here (currently cell * 0.9).
+    //  Change home slot pawn-slot circle size here (currently cell * 0.9).
     final double pawnSize = cell * 0.9;
     final double padding = (cell - pawnSize) / 2;
     final double slotRadius = pawnSize / 2;
 
-    // ADJUSTABLE: Change home slot fill opacity here (currently 0.35).
+    // Change home slot fill opacity here (currently 0.35).
     final Paint fillPaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.35)
       ..style = PaintingStyle.fill;
 
-    // ADJUSTABLE: Change home slot border opacity and thickness here.
+    //  Change home slot border opacity and thickness here.
     final Paint borderPaint = Paint()
       ..color = Colors.black.withValues(alpha: 0.25)
       ..strokeWidth = 1

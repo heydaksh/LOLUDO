@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:ludo_game/providers/game_provider.dart';
+import 'package:ludo_game/widgets/pawn_visuals_stack.dart';
 import 'package:provider/provider.dart';
 
 import '../models/game_models.dart';
@@ -69,7 +70,7 @@ class _PawnWidgetState extends State<PawnWidget> with TickerProviderStateMixin {
   // ==============================
 
   // Glow opacity pulse (0.0 → 1.0), multiplied against box-shadow alpha.
-  late Animation<double> _glowAnimation;
+  late Animation<double> glowAnimation;
 
   // ADJUSTABLE: Change finishing vertical stretch here (begin: 1.0, end: 1.6).
   late Animation<double> _stretch;
@@ -96,7 +97,7 @@ class _PawnWidgetState extends State<PawnWidget> with TickerProviderStateMixin {
       duration: AppConfig.pawnSelectionIndicatorRotationDuration,
     )..repeat();
 
-    _glowAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+    glowAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _highlightController, curve: Curves.easeInOut),
     );
 
@@ -339,241 +340,14 @@ class _PawnWidgetState extends State<PawnWidget> with TickerProviderStateMixin {
                             ),
 
                             // ─── PAWN VISUAL STACK ───
-                            child: Stack(
-                              alignment: Alignment.center,
-                              clipBehavior: Clip.none,
-                              children: [
-                                // ─── ROTATING SELECTION INDICATOR ───
-                                if (showRotatingIndicator)
-                                  Positioned(
-                                    // ADJUSTABLE: Change indicator circle size here (pawnSize * 1.3).
-                                    width: pawnSize * 1.3,
-                                    height: pawnSize * 1.3,
-                                    child: AnimatedBuilder(
-                                      animation: _rotationController,
-                                      builder: (context, child) {
-                                        return Transform.rotate(
-                                          angle:
-                                              _rotationController.value *
-                                              2 *
-                                              math.pi,
-                                          child: CustomPaint(
-                                            painter: _DashedCirclePainter(
-                                              color: Colors.black,
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-
-                                // ─── PAWN BODY CONTAINER ───
-                                Container(
-                                  width: pawnSize,
-                                  height: pawnSize,
-                                  decoration: BoxDecoration(
-                                    boxShadow: [
-                                      // Drop shadow.
-                                      BoxShadow(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.45,
-                                        ),
-                                        blurRadius: 6,
-                                        offset: const Offset(2, 4),
-                                      ),
-
-                                      // Colored glow when moveable.
-                                      if (game.canPawnMove(widget.pawn))
-                                        BoxShadow(
-                                          color:
-                                              _getPawnColor(
-                                                widget.pawn.color,
-                                              ).withValues(
-                                                alpha:
-                                                    0.8 * _glowAnimation.value,
-                                              ),
-                                          blurRadius: 15 * _glowAnimation.value,
-                                          spreadRadius:
-                                              3 * _glowAnimation.value,
-                                        ),
-
-                                      // Token glows when super powered.
-                                      if (widget.pawn.hasReverse)
-                                        BoxShadow(
-                                          color:
-                                              (widget.pawn.state ==
-                                                      PawnState.onHomeStretch ||
-                                                  widget.pawn.state ==
-                                                      PawnState.finished)
-                                              ? Colors.transparent
-                                              : Colors.purpleAccent.withValues(
-                                                  alpha: 0.9,
-                                                ),
-                                          blurRadius: 12,
-                                          spreadRadius: 4,
-                                        ),
-
-                                      // when shielded
-                                      if (widget.pawn.isShielded)
-                                        BoxShadow(
-                                          color:
-                                              (widget.pawn.state ==
-                                                      PawnState.onHomeStretch ||
-                                                  widget.pawn.state ==
-                                                      PawnState.finished)
-                                              ? Colors.transparent
-                                              : Colors.cyanAccent.withValues(
-                                                  alpha: 0.9,
-                                                ),
-                                          blurRadius: 12,
-                                          spreadRadius: 4,
-                                        ),
-                                    ],
-                                  ),
-                                  child: Stack(
-                                    alignment: Alignment.center,
-                                    children: [
-                                      /// PAWN BASE DISC
-                                      Positioned(
-                                        bottom: 0,
-                                        child: Container(
-                                          // ADJUSTABLE: Change base disc size here.
-                                          width: pawnSize * 0.85,
-                                          height: pawnSize * 0.45,
-                                          decoration: BoxDecoration(
-                                            color: _getPawnDarkColor(
-                                              widget.pawn.color,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              pawnSize,
-                                            ),
-                                            border: Border.all(
-                                              color: Colors.black87,
-                                              width: 1,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-
-                                      /// PAWN CYLINDER BODY
-                                      Positioned(
-                                        // ADJUSTABLE: Change stem bottom offset here (pawnSize * 0.18).
-                                        bottom: pawnSize * 0.18,
-                                        child: Container(
-                                          // ADJUSTABLE: Change stem dimensions here.
-                                          width: pawnSize * 0.48,
-                                          height: pawnSize * 0.80,
-                                          decoration: BoxDecoration(
-                                            color: _getPawnColor(
-                                              widget.pawn.color,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              6,
-                                            ),
-                                            border: Border.all(
-                                              color: Colors.black54,
-                                              width: 1,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-
-                                      /// TOP HEAD
-                                      Positioned(
-                                        // ADJUSTABLE: Change head bottom offset here (pawnSize * 0.48).
-                                        bottom: pawnSize * 0.48,
-                                        child: Container(
-                                          // ADJUSTABLE: Change head size here (pawnSize * 0.40).
-                                          width: pawnSize * 0.40,
-                                          height: pawnSize * 0.40,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            gradient: RadialGradient(
-                                              center: const Alignment(
-                                                -0.3,
-                                                -0.4,
-                                              ),
-                                              radius: 0.8,
-                                              colors: [
-                                                Colors.white.withValues(
-                                                  alpha: 0.8,
-                                                ),
-                                                _getPawnColor(
-                                                  widget.pawn.color,
-                                                ),
-                                                _getPawnDarkColor(
-                                                  widget.pawn.color,
-                                                ),
-                                              ],
-                                            ),
-                                            border: Border.all(
-                                              color: Colors.black54,
-                                              width: 1,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-
-                                      /// TOP DOT (shine)
-                                      Positioned(
-                                        // ADJUSTABLE: Change shine dot position here (pawnSize * 0.63).
-                                        bottom: pawnSize * 0.63,
-                                        child: Container(
-                                          // ADJUSTABLE: Change shine dot size here (pawnSize * 0.12).
-                                          width: pawnSize * 0.12,
-                                          height: pawnSize * 0.12,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: Colors.white.withValues(
-                                              alpha: 0.6,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-
-                                      // -- SUPER POWER ICONS ---
-                                      if (widget.pawn.hasReverse &&
-                                          widget.pawn.state !=
-                                              PawnState.onHomeStretch &&
-                                          widget.pawn.state !=
-                                              PawnState.finished)
-                                        Positioned(
-                                          bottom: pawnSize * 0.85,
-                                          child: Icon(
-                                            Icons.u_turn_left,
-                                            color: Colors.purpleAccent,
-                                            size: pawnSize * 0.5,
-                                            shadows: const [
-                                              Shadow(
-                                                color: Colors.black,
-                                                blurRadius: 4,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      if (widget.pawn.isShielded &&
-                                          widget.pawn.state !=
-                                              PawnState.onHomeStretch &&
-                                          widget.pawn.state !=
-                                              PawnState.finished)
-                                        Positioned(
-                                          bottom: pawnSize * 0.85,
-                                          child: Icon(
-                                            Icons.shield,
-                                            color: Colors.cyanAccent,
-                                            size: pawnSize * 0.5,
-                                            shadows: const [
-                                              Shadow(
-                                                color: Colors.black,
-                                                blurRadius: 4,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                            // child: PawnVisualsStack(showRotatingIndicator, pawnSize, game),
+                            child: PawnVisualsStack(
+                              pawn: widget.pawn,
+                              showRotatingIndicator: showRotatingIndicator,
+                              pawnSize: pawnSize,
+                              game: game,
+                              rotationAnimation: _rotationController,
+                              glowAnimation: glowAnimation,
                             ),
                           ),
                         ),
@@ -587,81 +361,5 @@ class _PawnWidgetState extends State<PawnWidget> with TickerProviderStateMixin {
         ),
       ),
     );
-  }
-
-  // ==============================
-  // COLOR HELPERS
-  // ==============================
-
-  /// Returns the primary (lighter) color for the given [PlayerColor].
-  Color _getPawnColor(PlayerColor color) {
-    switch (color) {
-      case PlayerColor.green:
-        return Colors.green;
-      case PlayerColor.yellow:
-        return Colors.yellow.shade600;
-      case PlayerColor.blue:
-        return Colors.blue;
-      case PlayerColor.red:
-        return Colors.red;
-    }
-  }
-
-  /// Returns the darker shade of [PlayerColor] for the disc and head gradient shadow.
-  Color _getPawnDarkColor(PlayerColor color) {
-    switch (color) {
-      case PlayerColor.green:
-        return const Color.fromARGB(255, 62, 188, 68);
-      case PlayerColor.yellow:
-        return const Color.fromARGB(255, 239, 219, 0);
-      case PlayerColor.blue:
-        return const Color.fromARGB(255, 41, 129, 231);
-      case PlayerColor.red:
-        return const Color.fromARGB(255, 173, 60, 60);
-    }
-  }
-}
-
-// ==============================
-// DASHED CIRCLE PAINTER
-// Custom painter that draws 4 evenly-spaced arc segments
-// to create a dashed-circle indicator around a selectable pawn.
-// Rotated by _rotationController for a spinning effect.
-// ==============================
-
-class _DashedCirclePainter extends CustomPainter {
-  final Color color;
-
-  _DashedCirclePainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double radius = size.width / 2;
-
-    final Paint paint = Paint()
-      ..color = color.withValues(alpha: 0.8)
-      ..style = PaintingStyle.stroke
-      // ADJUSTABLE: Change stroke thickness here (currently 2.5).
-      ..strokeWidth = 2.5
-      ..strokeCap = StrokeCap.round;
-
-    final Rect rect = Rect.fromCircle(
-      center: Offset(radius, radius),
-      radius: radius,
-    );
-
-    // ADJUSTABLE: Change number of arc segments here (currently 4).
-    for (int i = 0; i < 4; i++) {
-      // ADJUSTABLE: Change arc gap (start offset) here — currently π/12.
-      final double startAngle = (math.pi / 2) * i + (math.pi / 12);
-      // ADJUSTABLE: Change arc dash length (sweep) here — currently π/3.
-      const double sweepAngle = math.pi / 3;
-      canvas.drawArc(rect, startAngle, sweepAngle, false, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DashedCirclePainter oldDelegate) {
-    return oldDelegate.color != color;
   }
 }

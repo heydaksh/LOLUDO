@@ -32,11 +32,14 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
     super.dispose();
   }
 
+  // Toogle player ------
   void _togglePlayer(int index) {
     setState(() {
       selectedPlayers[index] = !selectedPlayers[index];
     });
   }
+
+  // Start Game  ------
 
   void _startGame() {
     int count = selectedPlayers.where((e) => e).length;
@@ -83,6 +86,8 @@ class _PlayerSelectionScreenState extends State<PlayerSelectionScreen> {
 
     Navigator.pop(context, selectedData);
   }
+
+  // Player Base identify  ------
 
   Widget _playerBase(Color color, bool active, int index) {
     final size = MediaQuery.of(context).size;
